@@ -1,0 +1,1 @@
+import {NextResponse} from 'next/server';import {currentUser,publicUser} from '@/lib/auth';import {fail} from '@/lib/common';export async function GET(){const u=await currentUser();return u?NextResponse.json(publicUser(u)):fail('Unauthorized',401);}

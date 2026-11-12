@@ -1,0 +1,270 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+enum TemplateStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+enum AssignmentStatus {
+  DRAFT
+  ISSUED
+  PARTIAL
+  COMPLETED
+  CANCELLED
+}
+enum ItemCondition {
+  GOOD
+  DAMAGED
+  LOST
+}
+
+model User {
+ id String @id @default(cuid())
+ name String
+ email String @unique
+ passwordHash String
+ status UserStatus @default(ACTIVE)
+ roles UserRole[]
+ overrides UserPermissionOverride[]
+ createdAssignments Assignment[] @relation("AssignmentCreator")
+ receivedReturns ReturnTransaction[] @relation("ReturnReceiver")
+ auditLogs AuditLog[]
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+}
+model Role {
+ id String @id @default(cuid())
+ name String @unique
+ description String?
+ system Boolean @default(false)
+ users UserRole[]
+ permissions RolePermission[]
+ createdAt DateTime @default(now())
+}
+model UserRole {
+  userId String
+  roleId String
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  role Role @relation(fields:[roleId],references:[id],onDelete:Cascade)
+  @@id([userId,roleId])
+}
+model Permission {
+  id String @id @default(cuid())
+  key String @unique
+  module String
+  action String
+  roles RolePermission[]
+  overrides UserPermissionOverride[]
+}
+model RolePermission {
+  roleId String
+  permissionId String
+  scope String @default("ALL")
+  role Role @relation(fields:[roleId],references:[id],onDelete:Cascade)
+  permission Permission @relation(fields:[permissionId],references:[id],onDelete:Cascade)
+  @@id([roleId,permissionId])
+}
+model UserPermissionOverride {
+  userId String
+  permissionId String
+  allowed Boolean
+  scope String @default("ALL")
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  permission Permission @relation(fields:[permissionId],references:[id],onDelete:Cascade)
+  @@id([userId,permissionId])
+}
+model GarmentCategory {
+  id String @id @default(cuid())
+  name String @unique
+  fields MeasurementField[]
+  templates MeasurementTemplate[]
+  products Product[]
+  createdAt DateTime @default(now())
+}
+model MeasurementField {
+  id String @id @default(cuid())
+  name String
+  categoryId String?
+  category GarmentCategory? @relation(fields:[categoryId],references:[id],onDelete:SetNull)
+  unit String @default("in")
+  order Int @default(0)
+  templateFields TemplateField[]
+  values MeasurementValue[]
+  @@unique([name,categoryId])
+}
+model MeasurementTemplate {
+  id String @id @default(cuid())
+  name String
+  categoryId String
+  category GarmentCategory @relation(fields:[categoryId],references:[id])
+  status TemplateStatus @default(DRAFT)
+  sizes Json
+  qualityChecks Json?
+  fields TemplateField[]
+  products Product[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+model TemplateField {
+  templateId String
+  fieldId String
+  required Boolean @default(false)
+  order Int @default(0)
+  template MeasurementTemplate @relation(fields:[templateId],references:[id],onDelete:Cascade)
+  field MeasurementField @relation(fields:[fieldId],references:[id])
+  @@id([templateId,fieldId])
+}
+model SerialSetting {
+  id String @id @default("product")
+  prefix String @default("MT")
+  digits Int @default(4)
+  nextNumber Int @default(1)
+}
+model Product {
+  id String @id @default(cuid())
+  sn String @unique
+  code            String?
+  supplierId String?
+  supplierCode String? @unique
+  supplier Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  itemName String
+  categoryId String
+  category GarmentCategory @relation(fields:[categoryId],references:[id])
+  templateId String?
+  template MeasurementTemplate? @relation(fields:[templateId],references:[id])
+  pp String?
+  spn String?
+  wp String?
+  fabric String?
+  notes String?
+  noSizeText String? @db.Text
+  images ProductImage[]
+  measurements MeasurementValue[]
+  assignmentItems AssignmentItem[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([supplierId])
+}
+model ProductImage {
+  id String @id @default(cuid())
+  productId String
+  product Product @relation(fields:[productId],references:[id],onDelete:Cascade)
+  url String
+  order Int @default(0)
+}
+model MeasurementValue {
+  id String @id @default(cuid())
+  productId String
+  product Product @relation(fields:[productId],references:[id],onDelete:Cascade)
+  size String
+  fieldId String
+  field MeasurementField @relation(fields:[fieldId],references:[id])
+  value Decimal @db.Decimal(10,2)
+  @@unique([productId,size,fieldId])
+}
+model ModelProfile {
+  id String @id @default(cuid())
+  code String @unique
+  name String
+  phone String?
+  photoUrl String?
+  notes String?
+  active Boolean @default(true)
+  assignments Assignment[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+model Assignment {
+  id String @id @default(cuid())
+  number String @unique
+  modelId String
+  model ModelProfile @relation(fields:[modelId],references:[id])
+  createdById String
+  createdBy User @relation("AssignmentCreator",fields:[createdById],references:[id])
+  sentDate DateTime
+  expectedReturnDate DateTime?
+  status AssignmentStatus @default(ISSUED)
+  notes String?
+  items AssignmentItem[]
+  returns ReturnTransaction[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+model AssignmentItem {
+  id String @id @default(cuid())
+  assignmentId String
+  assignment Assignment @relation(fields:[assignmentId],references:[id],onDelete:Cascade)
+  productId String
+  product Product @relation(fields:[productId],references:[id])
+  size String
+  sentQty Int
+  returnItems ReturnItem[]
+  @@index([productId,size])
+}
+model ReturnTransaction {
+  id String @id @default(cuid())
+  assignmentId String
+  assignment Assignment @relation(fields:[assignmentId],references:[id])
+  receivedById String
+  receivedBy User @relation("ReturnReceiver",fields:[receivedById],references:[id])
+  receivedAt DateTime @default(now())
+  notes String?
+  items ReturnItem[]
+}
+model ReturnItem {
+  id               String @id @default(cuid())
+  transactionId    String
+  transaction      ReturnTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  assignmentItemId String
+  assignmentItem   AssignmentItem @relation(fields: [assignmentItemId], references: [id])
+  quantity         Int
+  dontWearQty      Int @default(0)
+  condition        ItemCondition @default(GOOD)
+}
+model AuditLog {
+  id String @id @default(cuid())
+  userId String?
+  user User? @relation(fields:[userId],references:[id],onDelete:SetNull)
+  action String
+  entity String
+  entityId String?
+  details Json?
+  createdAt DateTime @default(now())
+  @@index([createdAt])
+}
+
+enum SupplierStatus {
+ ACTIVE
+ INACTIVE
+}
+model Supplier {
+ id String @id @default(cuid())
+ code String @unique
+ name String
+ contactPerson String?
+ phone String?
+ email String?
+ address String?
+ notes String?
+ status SupplierStatus @default(ACTIVE)
+ products Product[]
+ productSequence SupplierProductSequence?
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+}
+
+model SupplierProductSequence {
+  supplierId String @id
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  nextNumber Int @default(1001)
+}

@@ -1,0 +1,1 @@
+export default function Home(){return <main>Garment Management API is running.</main>}

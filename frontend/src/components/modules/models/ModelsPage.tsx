@@ -5,7 +5,6 @@ import {
   useEffect,
   useMemo,
   useState,
-  type ChangeEvent,
 } from "react";
 
 import { createPortal } from "react-dom";
@@ -33,8 +32,10 @@ import {
 } from "lucide-react";
 
 import { useAccount } from "@/components/Shell";
+import ImageUpload from "@/components/shared/ImageUpload";
 
 import { api, saveEntity, deleteEntity } from "@/lib/client-api";
+import { EscapeKey } from "@/lib/useEscapeKey";
 
 type Model = {
   id: string;
@@ -56,10 +57,13 @@ type Model = {
 
 type ReturnItem = {
   quantity: number;
-
+  dontWearQty?: number | null;
   createdAt?: string;
-
-  return?: { createdAt?: string; receivedDate?: string; date?: string };
+  return?: {
+    createdAt?: string;
+    receivedDate?: string;
+    date?: string;
+  };
 };
 
 type AssignmentItem = {
@@ -127,7 +131,7 @@ const emptyDraft = (): Draft => ({
   active: true,
 });
 
-const dateText = (s?: string) => (s ? new Date(s).toLocaleDateString() : "—");
+const dateText = (s?: string) => (s ? new Date(s).toLocaleDateString() : "-");
 
 function Portal({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
@@ -137,53 +141,6 @@ function Portal({ children }: { children: React.ReactNode }) {
   }, []);
 
   return ready ? createPortal(children, document.body) : null;
-}
-
-async function imageToBase64(file: File): Promise<string> {
-  if (!file.type.startsWith("image/")) throw new Error("Select an image file");
-  const url = URL.createObjectURL(file);
-  try {
-    const img = new Image();
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error("Could not read image"));
-      img.src = url;
-    });
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("Canvas unavailable");
-    const target = 500 * 1024;
-    let maxDimension = Math.min(
-      1800,
-      Math.max(img.naturalWidth, img.naturalHeight),
-    );
-    for (let dimensionTry = 0; dimensionTry < 12; dimensionTry++) {
-      const scale = Math.min(
-        1,
-        maxDimension / Math.max(img.naturalWidth, img.naturalHeight),
-      );
-      canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
-      canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      for (let quality = 0.88; quality >= 0.3; quality -= 0.08) {
-        const result = canvas.toDataURL("image/jpeg", quality);
-        const encoded = result.slice(result.indexOf(",") + 1);
-        const padding = encoded.endsWith("==")
-          ? 2
-          : encoded.endsWith("=")
-            ? 1
-            : 0;
-        const bytes = (encoded.length * 3) / 4 - padding;
-        if (bytes <= target) return result;
-      }
-      maxDimension = Math.max(64, Math.floor(maxDimension * 0.75));
-    }
-    throw new Error("Could not compress photo below 500 KB");
-  } finally {
-    URL.revokeObjectURL(url);
-  }
 }
 
 function LazyPhoto({
@@ -277,7 +234,7 @@ function ModelHistory({
           return {
             id: `${assignment.id}-${item.id}`,
             product,
-            size: item.size || "—",
+            size: item.size || "-",
             sentDate: assignment.sentDate || "",
             status: String(assignment.status || "DRAFT").toUpperCase(),
             sent,
@@ -510,14 +467,14 @@ function ModelHistory({
                   </td>
                   <td className="px-3 py-2.5">
                     <span className="rounded-lg bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700">
-                      {row.product.sn || "—"}
+                      {row.product.sn || "-"}
                     </span>
                   </td>
                   <td className="px-3 py-2.5 font-semibold text-slate-700">
-                    {row.product.supplierCode || "—"}
+                    {row.product.supplierCode || "-"}
                   </td>
                   <td className="px-3 py-2.5 text-slate-700">
-                    {row.product.itemName || row.product.sn || "—"} / {row.size}
+                    {row.product.itemName || row.product.sn || "-"} / {row.size}
                   </td>
                   <td className="px-3 py-2.5 text-slate-600">
                     {dateText(row.sentDate)}
@@ -567,7 +524,7 @@ function ModelHistory({
           {filteredRows.length
             ? (historyCurrentPage - 1) * historyLimit + 1
             : 0}
-          –{Math.min(historyCurrentPage * historyLimit, filteredRows.length)} of{" "}
+          -{Math.min(historyCurrentPage * historyLimit, filteredRows.length)} of{" "}
           {filteredRows.length}
         </span>
         <div className="flex items-center gap-2">
@@ -717,26 +674,6 @@ export default function ModelsPage() {
 
     currentPage * limit,
   );
-
-  const uploadPhoto = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-
-    e.target.value = "";
-
-    if (!file) return;
-
-    setUploading(true);
-
-    try {
-      const photoUrl = await imageToBase64(file);
-
-      setDraft((d) => (d ? { ...d, photoUrl } : d));
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Image upload failed");
-    } finally {
-      setUploading(false);
-    }
-  };
 
   const save = async () => {
     if (!draft || busy || uploading) return;
@@ -994,7 +931,7 @@ export default function ModelsPage() {
 
                     <td className="px-4 py-3 font-semibold">{m.name}</td>
 
-                    <td className="px-4 py-3">{m.phone || "—"}</td>
+                    <td className="px-4 py-3">{m.phone || "-"}</td>
 
                     <td className="px-4 py-3">
                       <span
@@ -1079,7 +1016,7 @@ export default function ModelsPage() {
                     <tr key={`${m.id}-history`} className="bg-slate-50/80">
                       <td colSpan={7} className="p-5">
                         <h3 className="mb-3 font-bold text-slate-800">
-                          Assignment & Return History — {m.name}
+                          Assignment & Return History - {m.name}
                         </h3>
                         {historyError ? (
                           <p className="text-sm text-amber-700">
@@ -1114,7 +1051,7 @@ export default function ModelsPage() {
 
         <footer className="flex flex-wrap items-center justify-end gap-3 border-t p-4 text-sm text-slate-500">
           <span>
-            Showing {filtered.length ? (currentPage - 1) * limit + 1 : 0}–
+            Showing {filtered.length ? (currentPage - 1) * limit + 1 : 0}-
             {Math.min(currentPage * limit, filtered.length)} of{" "}
             {filtered.length}
           </span>
@@ -1162,6 +1099,7 @@ export default function ModelsPage() {
 
       {previewImage && (
         <Portal>
+          <EscapeKey onEscape={() => setPreviewImage(null)} />
           <div
             className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/80 p-4"
             role="dialog"
@@ -1198,6 +1136,7 @@ export default function ModelsPage() {
 
       {draft && (
         <Portal>
+          <EscapeKey onEscape={() => !busy && setDraft(null)} />
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4">
             <div
               role="dialog"
@@ -1268,39 +1207,16 @@ export default function ModelsPage() {
                   <div className="sm:col-span-2">
                     <p className="mb-2 text-sm font-semibold">Model Photo</p>
 
-                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-violet-300 bg-violet-50 px-4 py-3 font-semibold text-violet-700">
-                      <ImagePlus size={18} />
-
-                      {uploading ? "Processing..." : "Choose Photo"}
-
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        onChange={uploadPhoto}
-                        className="sr-only"
-                        disabled={uploading || busy}
-                      />
-                    </label>
-
-                    {draft.photoUrl && (
-                      <div className="mt-3 flex items-center gap-3">
-                        <LazyPhoto
-                          src={draft.photoUrl}
-                          alt="Model preview"
-                          className="h-24 w-24 rounded-xl object-cover"
-                        />
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setDraft((d) => d && { ...d, photoUrl: "" })
-                          }
-                          className="rounded-lg border px-3 py-2 text-sm text-red-600"
-                        >
-                          Remove Photo
-                        </button>
-                      </div>
-                    )}
+                    <ImageUpload
+                      value={draft.photoUrl ? [draft.photoUrl] : []}
+                      onChange={(urls) =>
+                        setDraft((d) => d && { ...d, photoUrl: urls[0] ?? "" })
+                      }
+                      max={1}
+                      hint="JPG, PNG or WebP up to 5 MB. Saved as WebP (about 50-70 KB)."
+                      disabled={busy}
+                      onBusyChange={setUploading}
+                    />
                   </div>
 
                   <label className="flex items-center gap-2 text-sm font-semibold">
@@ -1345,6 +1261,7 @@ export default function ModelsPage() {
 
       {deleting && (
         <Portal>
+          <EscapeKey onEscape={() => !busy && setDeleting(null)} />
           <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/60 p-4">
             <div
               role="alertdialog"

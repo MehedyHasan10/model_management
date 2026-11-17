@@ -1,6 +1,7 @@
 "use client";
 import { Pencil, Ruler, Trash2 } from "lucide-react";
 import type { MeasurementField } from "./FieldsPage";
+import { unitLabel } from "./FieldsPage";
 type Props = {
   rows: MeasurementField[];
   canEdit: boolean;
@@ -52,11 +53,7 @@ export default function FieldsGrid({
           <h3 className="mt-5 text-lg font-bold text-slate-900">{r.name}</h3>
           <p className="mt-2 text-xs text-slate-500">
             Unit:{" "}
-            {r.unit === "cm"
-              ? "Centimeters (cm)"
-              : r.unit === "in"
-                ? "Inches (in)"
-                : r.unit}
+            {unitLabel(r.unit)}
           </p>
         </div>
       ))}

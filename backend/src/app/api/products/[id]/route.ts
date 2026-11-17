@@ -5,6 +5,8 @@ import { currentUser, can } from "@/lib/auth";
 import { fail, audit } from "@/lib/common";
 import { Prisma } from "@prisma/client";
 import { allocateSupplierCode } from "@/lib/product-supplier-code";
+import { measurementValueSchema } from "@/lib/measurement";
+import { productImagesSchema } from "@/lib/productImageValidation";
 
 const entity = "products";
 const schema = z
@@ -14,25 +16,18 @@ const schema = z
     categoryId: z.string().min(1).max(128),
     templateId: z.string().min(1).max(128).nullish(),
     pp: z.string().max(100).nullish(),
+    sp: z.string().max(100).nullish(),
     wp: z.string().max(100).nullish(),
     fabric: z.string().max(300).nullish(),
     notes: z.string().max(5000).nullish(),
     noSizeText: z.string().max(2000).nullish(),
-    images: z
-      .array(
-        z
-          .string()
-          .regex(/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/)
-          .max(1000000),
-      )
-      .max(15)
-      .default([]),
+    images: productImagesSchema.default([]),
     measurements: z
       .array(
         z.object({
           size: z.string().min(1).max(30),
           fieldId: z.string().min(1).max(128),
-          value: z.number().finite(),
+          value: measurementValueSchema,
         }),
       )
       .max(1000)
@@ -91,6 +86,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
             categoryId: input.categoryId,
             templateId: input.templateId || null,
             pp: input.pp,
+            sp: input.sp,
             wp: input.wp,
             fabric: input.fabric,
             notes: input.notes,

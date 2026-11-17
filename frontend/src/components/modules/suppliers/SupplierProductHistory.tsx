@@ -170,7 +170,7 @@ export default function SupplierProductHistory({
     <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 text-slate-800">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="font-bold">
-          {supplierName} — Product &amp; Assignment History
+          {supplierName} - Product &amp; Assignment History
         </h3>
         <button
           type="button"
@@ -310,9 +310,9 @@ export default function SupplierProductHistory({
                       alt={r.product.itemName || "Product"}
                     />
                   </td>
-                  <td className="px-3 py-2">{r.product.sn || "—"}</td>
-                  <td className="px-3 py-2">{r.product.supplierCode || "—"}</td>
-                  <td className="px-3 py-2">{r.product.itemName || "—"}</td>
+                  <td className="px-3 py-2">{r.product.sn || "-"}</td>
+                  <td className="px-3 py-2">{r.product.supplierCode || "-"}</td>
+                  <td className="px-3 py-2">{r.product.itemName || "-"}</td>
                   <td className="px-3 py-2 font-semibold text-blue-600">
                     {r.sent}
                   </td>
@@ -340,7 +340,7 @@ export default function SupplierProductHistory({
 
       <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 px-4 py-3 text-xs text-slate-600">
         <span className="whitespace-nowrap">
-          Showing {loading ? "…" : `${first}–${last} of ${total}`}
+          Showing {loading ? "…" : `${first}-${last} of ${total}`}
         </span>
 
         <div className="flex items-center gap-2">

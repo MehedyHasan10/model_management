@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useState, type FormEvent } from "react";
 import { Save, X, Loader2 } from "lucide-react";
+import { useEscapeKey } from "@/lib/useEscapeKey";
 
 export type FieldOption = { id: string; name: string };
 export type CategoryOption = { id: string; name: string };
@@ -10,8 +11,6 @@ export type QualityChecks = {
   shrinkResistance: boolean;
   bubblingResistance: boolean;
   printEmbroideryQuality: boolean;
-  noMeasurementFieldId?: string;
-  noMeasurementText?: string;
 };
 export type TemplateDraft = {
   id?: string;
@@ -75,18 +74,34 @@ export function normalizeDraft(row: any): TemplateDraft {
     status: row.status || "ACTIVE",
     sizes: Array.isArray(row.sizes) ? [...row.sizes] : [...standardSizes],
     fieldIds,
-    qualityChecks: { ...standardChecks, ...(row.qualityChecks || {}) },
-    noMeasurementFieldId: row.qualityChecks?.noMeasurementFieldId || "",
-    noMeasurementText: row.qualityChecks?.noMeasurementText || "",
+    qualityChecks: pickQualityChecks(row.qualityChecks),
+    noMeasurementFieldId:
+      row.noMeasurementFieldId || row.qualityChecks?.noMeasurementFieldId || "",
+    noMeasurementText:
+      row.noMeasurementText || row.qualityChecks?.noMeasurementText || "",
   };
 }
 
-const checkLabels: Record<keyof QualityChecks, string> = {
+// The only quality checks. No Measurement settings are separate template
+// values and must never be listed here.
+export const checkLabels: Record<keyof QualityChecks, string> = {
   colorGuarantee: "Color Guarantee",
   shrinkResistance: "Shrink Resistance",
   bubblingResistance: "Bubbling Resistance",
   printEmbroideryQuality: "Print / Embroidery Quality",
 };
+
+/** Keeps only the known boolean checks from saved data. */
+export function pickQualityChecks(value: unknown): QualityChecks {
+  const source = (value && typeof value === "object" ? value : {}) as Record<
+    string,
+    unknown
+  >;
+  const checks = { ...standardChecks };
+  for (const key of Object.keys(checks) as Array<keyof QualityChecks>)
+    checks[key] = source[key] === true;
+  return checks;
+}
 const inputStyle =
   "mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100";
 
@@ -125,13 +140,9 @@ export default function TemplateFormModal({
       document.body.style.overflow = previous;
     };
   }, []);
-  useEffect(() => {
-    const handle = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !busy) onCancel();
-    };
-    window.addEventListener("keydown", handle);
-    return () => window.removeEventListener("keydown", handle);
-  }, [busy, onCancel]);
+  useEscapeKey(() => {
+    if (!busy) onCancel();
+  });
 
   function update<K extends keyof TemplateDraft>(
     key: K,

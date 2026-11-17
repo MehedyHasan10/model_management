@@ -116,7 +116,7 @@ function Form({ value, change, related }: FormProps) {
             </div>
 
             <p className="break-all text-sm text-slate-600">
-              {value.email || "—"}
+              {value.email || "-"}
             </p>
           </div>
 
@@ -241,7 +241,7 @@ export default function UsersPage() {
             <div className="flex items-center gap-2 text-sm text-slate-600">
               <Mail size={15} className="shrink-0 text-slate-400" />
 
-              <span className="break-all">{row.email || "—"}</span>
+              <span className="break-all">{row.email || "-"}</span>
             </div>
           ),
         },
@@ -307,7 +307,7 @@ export default function UsersPage() {
                     month: "short",
                     year: "numeric",
                   })
-                : "—"}
+                : "-"}
             </span>
           ),
         },

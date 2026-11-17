@@ -69,6 +69,19 @@ async function main() {
     update: {},
     create: { id: "product" },
   });
+  const units = [
+    { id: "unit_inches", name: "Inches", symbol: "in" },
+    { id: "unit_centimeters", name: "Centimeters", symbol: "cm" },
+  ];
+  for (const unit of units) {
+    const found = await db.measurementUnit.findFirst({
+      where: { symbol: { equals: unit.symbol, mode: "insensitive" } },
+    });
+    if (!found) await db.measurementUnit.create({ data: unit });
+  }
+  const inches = await db.measurementUnit.findFirstOrThrow({
+    where: { symbol: { equals: "in", mode: "insensitive" } },
+  });
   for (const [name, fields] of Object.entries({
     Pant: ["Pant Waist", "Pant Length", "Thigh", "Hip", "Leg Opening"],
     "Shirt / Tops": ["Bust", "Sleeve", "Length", "Flare"],
@@ -86,7 +99,7 @@ async function main() {
       });
       if (!found)
         await db.measurementField.create({
-          data: { name: field, categoryId: cat.id, order },
+          data: { name: field, categoryId: cat.id, order, unitId: inches.id },
         });
     }
   }

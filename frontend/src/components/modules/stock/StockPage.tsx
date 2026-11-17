@@ -10,6 +10,7 @@ import { api } from "@/lib/client-api";
 
 import Pagination from "@/components/shared/Pagination";
 
+import { plural } from "@/lib/format";
 type ProductImage = { url: string; order?: number };
 
 type StockRow = {
@@ -92,7 +93,7 @@ function dateKey(value: string | null | undefined): string {
 function formatDate(value: string | null): string {
   const key = dateKey(value);
 
-  if (!key) return "—";
+  if (!key) return "-";
 
   const [year, month, day] = key.split("-");
 
@@ -196,17 +197,17 @@ export default function StockPage() {
             assignment.model?.name ||
             "",
 
-          model: assignment.model?.name || "—",
+          model: assignment.model?.name || "-",
 
-          sn: product.sn || "—",
+          sn: product.sn || "-",
 
-          supplierCode: product.supplierCode || "—",
+          supplierCode: product.supplierCode || "-",
 
-          productName: product.itemName || "—",
+          productName: product.itemName || "-",
 
           image: images[0]?.url || null,
 
-          size: item.size || "—",
+          size: item.size || "-",
 
           sent,
 
@@ -395,7 +396,7 @@ export default function StockPage() {
 
         <div className="flex items-center justify-between gap-2 px-5 py-3 text-xs text-slate-500">
           <span>
-            {filtered.length} records{hasFilters ? " matching filters" : ""}
+            {plural(filtered.length, "record")}{hasFilters ? " matching filters" : ""}
           </span>
 
           {fromDate && toDate && fromDate > toDate && (

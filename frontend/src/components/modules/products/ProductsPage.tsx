@@ -7,7 +7,6 @@ import {
   lazy,
   Suspense,
   useState,
-  type ChangeEvent,
   type ReactNode,
 } from "react";
 
@@ -17,7 +16,6 @@ import {
   Eye,
   Grid2X2,
   Image as ImageIcon,
-  ImagePlus,
   LayoutList,
   Loader2,
   Pencil,
@@ -40,14 +38,24 @@ import { api, saveEntity, deleteEntity } from "@/lib/client-api";
 
 import SearchableDropdown from "./SearchableDropdown";
 
-import { compressImage, MAX_IMAGE_BYTES } from "./imageCompression";
+import ImageUpload from "@/components/shared/ImageUpload";
+
+import {
+  MEASUREMENT_VALUE_MESSAGE,
+  isValidMeasurementValue,
+  measurementText,
+  normalizeMeasurementValue,
+} from "@/lib/measurement";
+
+import { EMPTY, localDateInput } from "@/lib/format";
+import { EscapeKey } from "@/lib/useEscapeKey";
 
 const ProductPreviewModal = lazy(() => import("./ProductPreviewModal"));
 
 type Field = {
   fieldId: string;
 
-  field?: { name: string; unit?: string };
+  field?: { name: string; unit?: { name: string; symbol: string } | null };
 
   order?: number;
 };
@@ -62,7 +70,8 @@ type Template = {
   status?: string;
 
   sizes?: string[];
-  qualityChecks?: { noMeasurementFieldId?: string; noMeasurementText?: string };
+  noMeasurementFieldId?: string | null;
+  noMeasurementText?: string | null;
 
   fields?: Field[];
 };
@@ -75,7 +84,7 @@ type SupplierOption = {
   status: string;
 };
 
-type Measurement = { size: string; fieldId: string; value: number };
+type Measurement = { size: string; fieldId: string; value: string };
 
 type Product = {
   id: string;
@@ -99,6 +108,8 @@ type Product = {
   measurements?: Measurement[];
 
   pp?: string | null;
+
+  sp?: string | null;
 
   supplierId?: string | null;
   supplierCode?: string | null;
@@ -129,6 +140,8 @@ type Draft = {
 
   pp: string;
 
+  sp: string;
+
   wp: string;
 
   fabric: string;
@@ -153,6 +166,8 @@ const emptyDraft = (): Draft => ({
 
   pp: "",
 
+  sp: "",
+
   wp: "",
 
   fabric: "",
@@ -169,10 +184,10 @@ const emptyDraft = (): Draft => ({
 const getImages = (p: Product) =>
   (p.images || []).map((x) => (typeof x === "string" ? x : x.url));
 
-const dateLabel = (s?: string) => (s ? new Date(s).toLocaleDateString() : "—");
+const dateLabel = (s?: string) => (s ? new Date(s).toLocaleDateString() : "-");
 
-const asDate = (s?: string) =>
-  s ? new Date(s).toISOString().slice(0, 10) : "";
+// Local calendar date, so the From/To filter matches the date shown in the list.
+const asDate = (s?: string) => (s ? localDateInput(new Date(s)) : "");
 
 function ModalPortal({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false);
@@ -350,6 +365,8 @@ export default function ProductsPage() {
 
             p.pp,
 
+            p.sp,
+
             p.wp,
           ]
 
@@ -463,6 +480,8 @@ export default function ProductsPage() {
 
       pp: p.pp || "",
 
+      sp: p.sp || "",
+
       wp: p.wp || "",
 
       fabric: p.fabric || "",
@@ -478,7 +497,7 @@ export default function ProductsPage() {
 
         fieldId: m.fieldId,
 
-        value: Number(m.value),
+        value: measurementText(m.value),
       })),
     });
   };
@@ -488,34 +507,6 @@ export default function ProductsPage() {
   const options = templates.filter(
     (t) => t.categoryId === draft?.categoryId && t.status !== "ARCHIVED",
   );
-
-  const addImages = async (e: ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-
-    e.target.value = "";
-
-    if (!draft || !files.length) return;
-
-    if (draft.images.length + files.length > 15) {
-      toast.error("Maximum 15 images allowed");
-
-      return;
-    }
-
-    setUploading(true);
-
-    try {
-      const result: string[] = [];
-
-      for (const file of files) result.push(await compressImage(file));
-
-      setDraft((d) => (d ? { ...d, images: [...d.images, ...result] } : d));
-    } catch (error: any) {
-      toast.error(error?.message || "Image compression failed");
-    } finally {
-      setUploading(false);
-    }
-  };
 
   const setMeasurement = (size: string, fieldId: string, text: string) =>
     setDraft((d) => {
@@ -529,11 +520,13 @@ export default function ProductsPage() {
         ...d,
 
         measurements:
-          text === ""
-            ? rest
-            : [...rest, { size, fieldId, value: Number(text) }],
+          text.trim() === "" ? rest : [...rest, { size, fieldId, value: text }],
       };
     });
+
+  const measurementValue = (size: string, fieldId: string) =>
+    draft?.measurements.find((m) => m.size === size && m.fieldId === fieldId)
+      ?.value ?? "";
 
   const save = async () => {
     if (!draft || busy) return;
@@ -582,22 +575,26 @@ export default function ProductsPage() {
       );
       return;
     }
-    if (
-      draft.images.length > 15 ||
-      draft.images.some(
-        (i) =>
-          !i.startsWith("data:image/jpeg;base64,") ||
-          Math.floor(((i.split(",")[1] || "").length * 3) / 4) >
-            MAX_IMAGE_BYTES,
-      )
-    ) {
-      invalid("Each image must be a compressed JPEG under 700 KB");
+    if (uploading) {
+      invalid("Wait for the images to finish uploading");
 
       return;
     }
 
-    if (draft.measurements.some((m) => !Number.isFinite(m.value))) {
-      invalid("Invalid measurement");
+    if (draft.images.length > 15) {
+      invalid("Maximum 15 images allowed");
+
+      return;
+    }
+
+    const measurements = draft.measurements.map((m) => ({
+      ...m,
+      value: normalizeMeasurementValue(m.value),
+    }));
+
+    if (measurements.some((m) => !isValidMeasurementValue(m.value))) {
+      setDraft((d) => (d ? { ...d, measurements } : d));
+      invalid(`Fix the highlighted measurements. ${MEASUREMENT_VALUE_MESSAGE}`);
 
       return;
     }
@@ -606,7 +603,7 @@ export default function ProductsPage() {
 
     try {
       const { sn: _sn, ...payload } = draft;
-      await saveEntity("products", payload);
+      await saveEntity("products", { ...payload, measurements });
 
       toast.success(draft.id ? "Product updated" : "Product created");
 
@@ -849,7 +846,7 @@ export default function ProductsPage() {
               >
                 <option value="newest">Newest First</option>
                 <option value="oldest">Oldest First</option>
-                <option value="name">Item Name A–Z</option>
+                <option value="name">Item Name A-Z</option>
               </select>
               <button
                 type="button"
@@ -906,7 +903,7 @@ export default function ProductsPage() {
           </div>
         ) : view === "list" ? (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[950px] text-sm">
+            <table className="w-full min-w-[1100px] text-sm">
               <thead className="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-500">
                 <tr>
                   {[
@@ -923,6 +920,10 @@ export default function ProductsPage() {
                     "Category",
 
                     "Template",
+
+                    "PP",
+
+                    "SP",
 
                     "Created",
 
@@ -945,8 +946,8 @@ export default function ProductsPage() {
                       {p.sn}
                     </td>
 
-                    <td className="px-4 py-3">{p.supplierCode || "—"}</td>
-                    <td className="px-4 py-3">{p.supplier?.name || "—"}</td>
+                    <td className="px-4 py-3">{p.supplierCode || "-"}</td>
+                    <td className="px-4 py-3">{p.supplier?.name || "-"}</td>
 
                     <td className="px-4 py-3">{thumb(p)}</td>
 
@@ -954,9 +955,13 @@ export default function ProductsPage() {
                       {p.itemName}
                     </td>
 
-                    <td className="px-4 py-3">{p.category?.name || "—"}</td>
+                    <td className="px-4 py-3">{p.category?.name || "-"}</td>
 
-                    <td className="px-4 py-3">{p.template?.name || "—"}</td>
+                    <td className="px-4 py-3">{p.template?.name || "-"}</td>
+
+                    <td className="px-4 py-3">{p.pp?.trim() || EMPTY}</td>
+
+                    <td className="px-4 py-3">{p.sp?.trim() || EMPTY}</td>
 
                     <td className="px-4 py-3 text-slate-500">
                       {dateLabel(p.createdAt)}
@@ -1005,11 +1010,11 @@ export default function ProductsPage() {
 
                   <p className="text-xs text-slate-500">
                     {p.supplierCode || "No supplier code"} ·{" "}
-                    {p.category?.name || "—"}
+                    {p.category?.name || "-"}
                   </p>
 
                   <p className="truncate text-xs text-slate-500">
-                    {p.template?.name || "—"}
+                    {p.template?.name || "-"}
                   </p>
 
                   {actions(p)}
@@ -1027,7 +1032,7 @@ export default function ProductsPage() {
 
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t p-4 text-sm text-slate-500">
           <span>
-            Showing {filtered.length ? (currentPage - 1) * limit + 1 : 0}–
+            Showing {filtered.length ? (currentPage - 1) * limit + 1 : 0}-
             {Math.min(currentPage * limit, filtered.length)} of{" "}
             {filtered.length}
           </span>
@@ -1074,6 +1079,7 @@ export default function ProductsPage() {
 
       {draft && (
         <ModalPortal>
+          <EscapeKey onEscape={() => !busy && setDraft(null)} />
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3">
             <div className="flex max-h-[94vh] w-full max-w-[1100px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
               <div className="flex shrink-0 items-center justify-between border-b px-6 py-4">
@@ -1190,12 +1196,20 @@ export default function ProductsPage() {
                       }
                     />
 
-                    {(["pp", "wp", "fabric", "notes"] as const).map((key) => (
+                    {(
+                      [
+                        ["pp", "PP"],
+                        ["sp", "SP"],
+                        ["fabric", "Fabric"],
+                        ["wp", "WP"],
+                        ["notes", "Notes"],
+                      ] as const
+                    ).map(([key, label]) => (
                       <label
                         key={key}
                         className={`block text-sm font-semibold text-slate-700 ${key === "notes" ? "sm:col-span-2" : ""}`}
                       >
-                        {key.toUpperCase()}
+                        {label}
 
                         {key === "notes" ? (
                           <textarea
@@ -1216,66 +1230,21 @@ export default function ProductsPage() {
                   </div>
 
                   <section className="rounded-2xl border p-4">
-                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                      <h3 className="font-bold">
-                        Product Images ({draft.images.length}/15)
-                      </h3>
+                    <h3 className="mb-3 font-bold">
+                      Product Images ({draft.images.length}/15)
+                    </h3>
 
-                      <p className="text-xs text-slate-500">
-                        Compressed JPEG, maximum 700 KB each
-                      </p>
-                    </div>
-
-                    <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-violet-200 bg-violet-50 p-4 font-semibold text-violet-700">
-                      <ImagePlus size={19} />
-
-                      {uploading ? "Compressing..." : "Choose images"}
-
-                      <input
-                        type="file"
-                        multiple
-                        accept="image/png,image/jpeg,image/webp"
-                        onChange={addImages}
-                        disabled={uploading || draft.images.length >= 15}
-                        className="sr-only"
-                      />
-                    </label>
-
-                    <div className="mt-4 flex flex-wrap gap-3">
-                      {draft.images.map((url, i) => (
-                        <div key={i} className="relative">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setImageViewer({ images: draft.images, index: i })
-                            }
-                          >
-                            <img
-                              loading="lazy"
-                              decoding="async"
-                              src={url}
-                              alt={`Image ${i + 1}`}
-                              className="h-24 w-24 rounded-xl border object-cover"
-                            />
-                          </button>
-
-                          <button
-                            type="button"
-                            aria-label={`Remove image ${i + 1}`}
-                            onClick={() =>
-                              update(
-                                "images",
-
-                                draft.images.filter((_, j) => j !== i),
-                              )
-                            }
-                            className="absolute -right-2 -top-2 rounded-full bg-red-500 p-1 text-white shadow"
-                          >
-                            <X size={14} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
+                    <ImageUpload
+                      value={draft.images}
+                      onChange={(images) => update("images", images)}
+                      max={15}
+                      hint="JPG, PNG or WebP up to 5 MB. Saved as WebP (about 50-70 KB)."
+                      disabled={busy}
+                      onBusyChange={setUploading}
+                      onOpen={(index) =>
+                        setImageViewer({ images: draft.images, index })
+                      }
+                    />
                   </section>
 
                   <section>
@@ -1302,7 +1271,7 @@ export default function ProductsPage() {
                           <tbody>
                             <tr>
                               <td className="border border-slate-200 p-3 font-semibold">
-                                {chosen.qualityChecks?.noMeasurementFieldId
+                                {chosen.noMeasurementFieldId
                                   ? "No Size / Free Size"
                                   : "No Size"}
                               </td>
@@ -1333,7 +1302,7 @@ export default function ProductsPage() {
                                 <th key={f.fieldId} className="p-3 text-left">
                                   {f.field?.name || f.fieldId}
 
-                                  {f.field?.unit ? ` (${f.field.unit})` : ""}
+                                  {f.field?.unit?.symbol ? ` (${f.field.unit.symbol})` : ""}
                                 </th>
                               ))}
                             </tr>
@@ -1344,31 +1313,58 @@ export default function ProductsPage() {
                               <tr key={size} className="border-t">
                                 <td className="p-3 font-bold">{size}</td>
 
-                                {(chosen.fields || []).map((f) => (
-                                  <td key={f.fieldId} className="p-2">
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      className="w-28 rounded-lg border px-2 py-2"
-                                      value={
-                                        draft.measurements.find(
-                                          (m) =>
-                                            m.size === size &&
-                                            m.fieldId === f.fieldId,
-                                        )?.value ?? ""
-                                      }
-                                      onChange={(e) =>
-                                        setMeasurement(
-                                          size,
-
-                                          f.fieldId,
-
-                                          e.target.value,
-                                        )
-                                      }
-                                    />
-                                  </td>
-                                ))}
+                                {(chosen.fields || []).map((f) => {
+                                  const value = measurementValue(
+                                    size,
+                                    f.fieldId,
+                                  );
+                                  const bad =
+                                    value !== "" &&
+                                    !isValidMeasurementValue(
+                                      normalizeMeasurementValue(value),
+                                    );
+                                  return (
+                                    <td
+                                      key={f.fieldId}
+                                      className="p-2 align-top"
+                                    >
+                                      <input
+                                        type="text"
+                                        inputMode="decimal"
+                                        maxLength={20}
+                                        aria-label={`${size} ${f.field?.name || "measurement"}`}
+                                        aria-invalid={bad}
+                                        className={`w-28 rounded-lg border px-2 py-2 outline-none ${
+                                          bad
+                                            ? "border-red-500 bg-red-50 focus:border-red-600"
+                                            : "focus:border-violet-500"
+                                        }`}
+                                        value={value}
+                                        onChange={(e) =>
+                                          setMeasurement(
+                                            size,
+                                            f.fieldId,
+                                            e.target.value,
+                                          )
+                                        }
+                                        onBlur={(e) =>
+                                          setMeasurement(
+                                            size,
+                                            f.fieldId,
+                                            normalizeMeasurementValue(
+                                              e.target.value,
+                                            ),
+                                          )
+                                        }
+                                      />
+                                      {bad && (
+                                        <p className="mt-1 w-28 text-[11px] leading-tight text-red-600">
+                                          {MEASUREMENT_VALUE_MESSAGE}
+                                        </p>
+                                      )}
+                                    </td>
+                                  );
+                                })}
                               </tr>
                             ))}
                           </tbody>
@@ -1433,6 +1429,7 @@ export default function ProductsPage() {
 
       {imageViewer && (
         <ModalPortal>
+          <EscapeKey onEscape={() => setImageViewer(null)} />
           <div
             className="fixed inset-0 z-[80] flex items-center justify-center bg-black/90 p-4"
             onClick={() => setImageViewer(null)}
@@ -1493,6 +1490,7 @@ export default function ProductsPage() {
 
       {deleting && (
         <ModalPortal>
+          <EscapeKey onEscape={() => !busy && setDeleting(null)} />
           <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/60 p-4">
             <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
               <h2 className="text-lg font-bold">Delete Product?</h2>

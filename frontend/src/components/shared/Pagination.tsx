@@ -17,7 +17,7 @@ export default function Pagination({
   return (
     <div className="flex flex-wrap items-center justify-end gap-2 pt-4 text-sm text-slate-500 [&_label]:flex [&_label]:items-center [&_label]:gap-2 [&_select]:rounded-lg [&_select]:border [&_select]:p-2 [&_button]:rounded-lg [&_button]:border [&_button]:px-3 [&_button]:py-2 [&_button:disabled]:opacity-40">
       <span>
-        Showing {total ? (current - 1) * limit + 1 : 0}–
+        Showing {total ? (current - 1) * limit + 1 : 0}-
         {Math.min(current * limit, total)} of {total}
       </span>
       <label>

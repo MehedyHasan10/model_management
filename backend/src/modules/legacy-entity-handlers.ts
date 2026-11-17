@@ -16,6 +16,20 @@ import { entityPermissions } from "@/lib/config";
 
 import { allocateSupplierCode } from "@/lib/product-supplier-code";
 
+import {
+  FIELD_NAME_TAKEN,
+  fieldNameTaken,
+  fieldWithUnit,
+  measurementValueSchema,
+} from "@/lib/measurement";
+
+import { cleanQualityChecks } from "@/lib/template-validation";
+
+import {
+  modelPhotoSchema,
+  productImagesSchema,
+} from "@/lib/productImageValidation";
+
 export const runtime = "nodejs";
 
 export const dynamic = "force-dynamic";
@@ -45,7 +59,7 @@ const fieldSchema = z
   .object({
     name,
 
-    unit: z.string().trim().min(1).max(20).default("in"),
+    unitId: z.string().trim().min(1, "Select a measurement unit").max(128),
 
     order: z.number().int().min(0).default(0),
   })
@@ -83,6 +97,8 @@ const productSchema = z
 
     pp: z.string().max(100).nullish(),
 
+    sp: z.string().max(100).nullish(),
+
     wp: z.string().max(100).nullish(),
 
     fabric: z.string().max(300).nullish(),
@@ -91,32 +107,7 @@ const productSchema = z
 
     noSizeText: z.string().max(2000).nullish(),
 
-    images: z
-      .array(
-        z
-          .string()
-          .regex(
-            /^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/,
-            "Only JPEG images are supported",
-          )
-          .superRefine((image, ctx) => {
-            const base64 = image.slice("data:image/jpeg;base64,".length);
-            const padding = base64.endsWith("==")
-              ? 2
-              : base64.endsWith("=")
-                ? 1
-                : 0;
-            const decodedBytes = (base64.length * 3) / 4 - padding;
-            if (decodedBytes > 700 * 1024) {
-              ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: "Each image must be 700 KB or smaller",
-              });
-            }
-          }),
-      )
-      .max(15, "Maximum 15 images are allowed")
-      .default([]),
+    images: productImagesSchema.default([]),
 
     measurements: z
 
@@ -128,7 +119,7 @@ const productSchema = z
 
             fieldId: id,
 
-            value: z.number().finite(),
+            value: measurementValueSchema,
           })
 
           .strict(),
@@ -148,24 +139,7 @@ const modelSchema = z
 
     phone: z.string().max(30).nullish(),
 
-    photoUrl: z
-      .union([
-        z.literal(""),
-        z.string().url().max(2048),
-        z
-          .string()
-          .regex(/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/)
-          .superRefine((value, ctx) => {
-            const b = value.slice("data:image/jpeg;base64,".length);
-            const p = b.endsWith("==") ? 2 : b.endsWith("=") ? 1 : 0;
-            if ((b.length * 3) / 4 - p > 500 * 1024)
-              ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: "Model photo must be 500 KB or smaller",
-              });
-          }),
-      ])
-      .nullish(),
+    photoUrl: modelPhotoSchema,
 
     notes: optionalText,
 
@@ -434,7 +408,7 @@ export async function GET(req: NextRequest, context: Context) {
 
       case "fields":
         data = await db.measurementField.findMany({
-          include: { category: true },
+          include: { category: true, unit: fieldWithUnit.include.unit },
 
           orderBy: { order: "asc" },
         });
@@ -447,7 +421,7 @@ export async function GET(req: NextRequest, context: Context) {
             category: true,
 
             fields: {
-              include: { field: true },
+              include: { field: fieldWithUnit },
 
               orderBy: { order: "asc" },
             },
@@ -470,7 +444,7 @@ export async function GET(req: NextRequest, context: Context) {
             template: {
               include: {
                 fields: {
-                  include: { field: true },
+                  include: { field: fieldWithUnit },
 
                   orderBy: { order: "asc" as const },
                 },
@@ -482,7 +456,7 @@ export async function GET(req: NextRequest, context: Context) {
             },
 
             measurements: {
-              include: { field: true },
+              include: { field: fieldWithUnit },
             },
           },
 
@@ -544,6 +518,8 @@ export async function GET(req: NextRequest, context: Context) {
 
                     pp: true,
 
+                    sp: true,
+
                     spn: true,
 
                     wp: true,
@@ -568,7 +544,7 @@ export async function GET(req: NextRequest, context: Context) {
 
                         fields: {
                           include: {
-                            field: true,
+                            field: fieldWithUnit,
                           },
 
                           orderBy: {
@@ -580,7 +556,7 @@ export async function GET(req: NextRequest, context: Context) {
 
                     measurements: {
                       include: {
-                        field: true,
+                        field: fieldWithUnit,
                       },
                     },
 
@@ -831,16 +807,17 @@ export async function POST(req: NextRequest, context: Context) {
       case "fields": {
         const v = fieldSchema.parse(body);
 
-        const existing = await db.measurementField.findMany({
-          select: { name: true },
-        });
+        if (await fieldNameTaken(v.name)) {
+          return json({ error: FIELD_NAME_TAKEN, field: "name" }, 409);
+        }
 
         if (
-          existing.some(
-            (f) => f.name.trim().toLowerCase() === v.name.toLowerCase(),
-          )
+          !(await db.measurementUnit.findUnique({ where: { id: v.unitId } }))
         ) {
-          return fail("Measurement field name already exists", 409);
+          return json(
+            { error: "Select a valid measurement unit", field: "unitId" },
+            400,
+          );
         }
 
         data = await db.measurementField.create({
@@ -849,6 +826,8 @@ export async function POST(req: NextRequest, context: Context) {
 
             categoryId: null,
           },
+
+          ...fieldWithUnit,
         });
 
         break;
@@ -877,7 +856,7 @@ export async function POST(req: NextRequest, context: Context) {
 
             sizes: v.sizes,
 
-            qualityChecks: (v.qualityChecks ?? {}) as Prisma.InputJsonValue,
+            qualityChecks: cleanQualityChecks(v.qualityChecks),
 
             fields: {
               create: v.fieldIds.map((fieldId, order) => ({
@@ -939,6 +918,8 @@ export async function POST(req: NextRequest, context: Context) {
               templateId: v.templateId || null,
 
               pp: v.pp,
+
+              sp: v.sp,
 
               wp: v.wp,
 

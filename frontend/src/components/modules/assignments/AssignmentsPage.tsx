@@ -14,6 +14,10 @@ import { useAccount } from "@/components/Shell";
 import ResourcePage, { type FormProps } from "@/components/shared/ResourcePage";
 import { TextField, SelectField } from "@/components/shared/FormFields";
 import { api } from "@/lib/client-api";
+import { ContentCell, ProductCodeButton } from "./AssignmentCells";
+import { localDateInput, plural } from "@/lib/format";
+import { measurementText } from "@/lib/measurement";
+import { useEscapeKey } from "@/lib/useEscapeKey";
 const returnQty = (i: any) =>
   (i.returnItems || []).reduce(
     (n: number, x: any) => n + Number(x.quantity || 0),
@@ -33,7 +37,7 @@ const returnedQty = (r: any) =>
 const dateText = (value: any) =>
   value && !Number.isNaN(new Date(value).getTime())
     ? new Date(value).toLocaleDateString()
-    : "—";
+    : "-";
 const productImages = (p: any): string[] =>
   (Array.isArray(p?.images) ? p.images : [])
     .map((img: any) => (typeof img === "string" ? img : img?.url))
@@ -56,7 +60,7 @@ const returnDate = (r: any) => {
     .filter(Boolean)
     .map((x: any) => new Date(x).getTime())
     .filter((x: number) => !Number.isNaN(x));
-  return dates.length ? dateText(Math.max(...dates)) : "—";
+  return dates.length ? dateText(Math.max(...dates)) : "-";
 };
 function ImagePreview({
   product,
@@ -67,10 +71,10 @@ function ImagePreview({
 }) {
   const images = productImages(product);
   const [index, setIndex] = useState<number | null>(null);
+  useEscapeKey(() => setIndex(null), index !== null);
   useEffect(() => {
     if (index === null) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setIndex(null);
       if (event.key === "ArrowRight")
         setIndex((i) => (i === null ? null : (i + 1) % images.length));
       if (event.key === "ArrowLeft")
@@ -203,7 +207,7 @@ function measurementValue(
   );
   const value = found?.value;
   return value === null || value === undefined || String(value).trim() === ""
-    ? "—"
+    ? "-"
     : String(value);
 }
 
@@ -215,13 +219,7 @@ export function AssignmentDetails({
   onClose: () => void;
 }) {
   const products = distinctProducts(assignment);
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  useEscapeKey(onClose);
   return (
     <div
       className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/60 p-3 sm:p-6"
@@ -260,7 +258,7 @@ export function AssignmentDetails({
               )}
               <div>
                 <p className="text-xs text-slate-500">Model</p>
-                <b>{assignment.model?.name || "—"}</b>
+                <b>{assignment.model?.name || "-"}</b>
               </div>
             </div>
             <div>
@@ -300,31 +298,37 @@ export function AssignmentDetails({
                       {product.itemName || "Product"}
                     </h3>
                     <p className="text-xs text-slate-500">
-                      Product Code: {product.sn || "—"} · Supplier Code:{" "}
-                      {product.supplierCode || "—"}
+                      Product Code: {product.sn || "-"} · Supplier Code:{" "}
+                      {product.supplierCode || "-"}
                     </p>
                     <p className="text-xs text-slate-500">
-                      Category: {product.category?.name || "—"} · Template:{" "}
-                      {product.template?.name || "—"}
+                      Category: {product.category?.name || "-"} · Template:{" "}
+                      {product.template?.name || "-"}
                     </p>
                   </div>
                 </div>
-                <div className="grid gap-3 border-b p-4 text-xs sm:grid-cols-3">
+                <div className="grid gap-3 border-b p-4 text-xs sm:grid-cols-5">
                   <div>
                     <span className="text-slate-500">Fabric</span>
-                    <p className="font-semibold">{product.fabric || "—"}</p>
+                    <p className="font-semibold">{product.fabric || "-"}</p>
                   </div>
-                  <div>
-                    <span className="text-slate-500">PP / WP</span>
-                    <p className="font-semibold">
-                      {[product.pp, product.spn, product.wp]
-                        .filter(Boolean)
-                        .join(" / ") || "—"}
-                    </p>
-                  </div>
+                  {(
+                    [
+                      ["PP", product.pp],
+                      ["SP", product.sp],
+                      ["WP", product.wp],
+                    ] as const
+                  ).map(([label, value]) => (
+                    <div key={label}>
+                      <span className="text-slate-500">{label}</span>
+                      <p className="font-semibold">
+                        {String(value ?? "").trim() || "-"}
+                      </p>
+                    </div>
+                  ))}
                   <div>
                     <span className="text-slate-500">Product Notes</span>
-                    <p className="font-semibold">{product.notes || "—"}</p>
+                    <p className="font-semibold">{product.notes || "-"}</p>
                   </div>
                 </div>
                 <div className="overflow-x-auto">
@@ -338,7 +342,7 @@ export function AssignmentDetails({
                             className="whitespace-nowrap px-3 py-3 text-center"
                           >
                             {f.field?.name || f.fieldId}
-                            {f.field?.unit ? ` (${f.field.unit})` : ""}
+                            {f.field?.unit?.symbol ? ` (${f.field.unit.symbol})` : ""}
                           </th>
                         ))}
                         <th className="px-3 py-3 text-center">Sent</th>
@@ -390,7 +394,7 @@ export function AssignmentDetails({
                     <div className="flex flex-wrap justify-between gap-2">
                       <b>{dateText(ret.receivedAt)}</b>
                       <span className="text-slate-500">
-                        Received by: {ret.receivedBy?.name || "—"}
+                        Received by: {ret.receivedBy?.name || "-"}
                       </span>
                     </div>
                     <div className="mt-1 text-slate-600">
@@ -399,7 +403,7 @@ export function AssignmentDetails({
                           const ai = (assignment.items || []).find(
                             (x: any) => x.id === i.assignmentItemId,
                           );
-                          return `${ai?.product?.itemName || "Product"} (${ai?.size || "—"}): ${i.quantity} pcs returned · Don't Wear: ${Number(i.dontWearQty || 0)}${i.condition ? ` · ${i.condition}` : ""}`;
+                          return `${ai?.product?.itemName || "Product"} (${ai?.size || "-"}): ${plural(i.quantity, "pc", "pcs")} returned · Don't Wear: ${Number(i.dontWearQty || 0)}${i.condition ? ` · ${i.condition}` : ""}`;
                         })
                         .join("; ")}
                     </div>
@@ -451,12 +455,7 @@ export const assignmentColumns = [
     render: (r: any) => (
       <div className="flex max-w-40 flex-wrap gap-1">
         {distinctProducts(r).map((p: any, idx: number) => (
-          <span
-            key={idx}
-            className="rounded-md bg-violet-50 px-2 py-1 text-xs font-semibold text-violet-700"
-          >
-            {p.sn || "—"}
-          </span>
+          <ProductCodeButton key={p.id || idx} product={p} />
         ))}
       </div>
     ),
@@ -470,7 +469,7 @@ export const assignmentColumns = [
             key={p.id || idx}
             className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700"
           >
-            {p.supplierCode || "—"}
+            {p.supplierCode || "-"}
           </span>
         ))}
       </div>
@@ -492,7 +491,7 @@ export const assignmentColumns = [
           </div>
         )}
         <span className="font-medium text-slate-800">
-          {r.model?.name || "—"}
+          {r.model?.name || "-"}
         </span>
       </div>
     ),
@@ -525,7 +524,7 @@ export const assignmentColumns = [
     ),
   },
   {
-    label: "Don't Wear",
+    label: "WSR",
     center: true,
     render: (r: any) => (
       <span className="font-bold text-violet-700">
@@ -534,10 +533,15 @@ export const assignmentColumns = [
     ),
   },
   {
+    label: "Content",
+    center: true,
+    render: (r: any) => <ContentCell row={r} />,
+  },
+  {
     label: "Status",
     center: true,
     render: (r: any) => {
-      const status = String(r.status || "—").toUpperCase();
+      const status = String(r.status || "-").toUpperCase();
       const color =
         status === "COMPLETED"
           ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
@@ -561,6 +565,7 @@ function Form({ value, change, related }: FormProps) {
   const products: any[] = related.products || [];
   const [productSearch, setProductSearch] = useState("");
   const [productDropdown, setProductDropdown] = useState(false);
+  useEscapeKey(() => setProductDropdown(false), productDropdown);
   const searchWrapRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -609,18 +614,13 @@ function Form({ value, change, related }: FormProps) {
         setProductDropdown(false);
       }
     };
-    const onEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setProductDropdown(false);
-    };
     window.addEventListener("resize", updateDropdownPosition);
     window.addEventListener("scroll", updateDropdownPosition, true);
     document.addEventListener("mousedown", onOutside);
-    document.addEventListener("keydown", onEscape);
     return () => {
       window.removeEventListener("resize", updateDropdownPosition);
       window.removeEventListener("scroll", updateDropdownPosition, true);
       document.removeEventListener("mousedown", onOutside);
-      document.removeEventListener("keydown", onEscape);
     };
   }, [productDropdown, updateDropdownPosition]);
 
@@ -735,16 +735,7 @@ function Form({ value, change, related }: FormProps) {
         byId.set(id, { fieldId: id, field: saved.field ?? { name: id } });
       }
     }
-    // Create Model Assign: show only Bust and Pant Waist measurements.
-    // Keep the existing template membership and saved-value checks above.
-    const allowedNames = new Set(["bust", "pant waist", "paint waist"]);
-    return Array.from(byId.values()).filter((entry: any) => {
-      const name = String(entry.field?.name ?? entry.name ?? "")
-        .trim()
-        .toLowerCase()
-        .replace(/\s+/g, " ");
-      return allowedNames.has(name);
-    });
+    return Array.from(byId.values());
   };
   const updateSize = (productId: string, size: string, checked: boolean) => {
     const withoutPlaceholder = items.filter(
@@ -809,7 +800,7 @@ function Form({ value, change, related }: FormProps) {
             </h3>
           </div>
           <div className="rounded-xl bg-violet-50 px-4 py-2 text-sm font-bold text-violet-700">
-            Total: {totalQty} pcs
+            Total: {plural(totalQty, "pc", "pcs")}
           </div>
         </div>
         <div className="max-w-md">
@@ -880,10 +871,10 @@ function Form({ value, change, related }: FormProps) {
                           </span>
                         )}
                         <span className="min-w-0">
-                          <strong className="text-violet-700">{p.sn}</strong> —{" "}
+                          <strong className="text-violet-700">{p.sn}</strong> -{" "}
                           {p.itemName}
                           <span className="block text-xs text-slate-500">
-                            Supplier Code: {p.supplierCode || "—"}
+                            Supplier Code: {p.supplierCode || "-"}
                           </span>
                         </span>
                       </button>
@@ -954,10 +945,10 @@ function Form({ value, change, related }: FormProps) {
                       {product.itemName}
                     </h4>
                     <p className="text-xs text-slate-600">
-                      Product Code: <b>{product.sn || product.code || "—"}</b>
+                      Product Code: <b>{product.sn || product.code || "-"}</b>
                     </p>
                     <p className="text-xs text-slate-600">
-                      Supplier Code: <b>{product.supplierCode || "—"}</b>
+                      Supplier Code: <b>{product.supplierCode || "-"}</b>
                     </p>
                   </div>
                   <button
@@ -1053,7 +1044,7 @@ function Form({ value, change, related }: FormProps) {
                           >
                             <th className="break-words border-r border-slate-200 px-1 py-2 text-left font-medium text-slate-600 sm:px-3">
                               {f.field?.name || f.fieldId}
-                              {f.field?.unit ? ` (${f.field.unit})` : ""}
+                              {f.field?.unit?.symbol ? ` (${f.field.unit.symbol})` : ""}
                             </th>
                             {sizes.map((size) => (
                               <td
@@ -1064,7 +1055,7 @@ function Form({ value, change, related }: FormProps) {
                                   (m: any) =>
                                     String(m.size) === size &&
                                     String(m.fieldId) === String(f.fieldId),
-                                )?.value ?? "—"}
+                                )?.value ?? "-"}
                               </td>
                             ))}
                           </tr>
@@ -1110,9 +1101,12 @@ function Form({ value, change, related }: FormProps) {
                     </p>
                   )}
                   <div className="border-t border-slate-100 px-3 py-2 text-right text-xs font-semibold text-violet-700">
-                    {selected.length} sizes selected ·{" "}
-                    {selected.reduce((n, i) => n + (Number(i.sentQty) || 0), 0)}{" "}
-                    pcs
+                    {plural(selected.length, "size")} selected ·{" "}
+                    {plural(
+                      selected.reduce((n, i) => n + (Number(i.sentQty) || 0), 0),
+                      "pc",
+                      "pcs",
+                    )}
                   </div>
                 </div>
               </div>
@@ -1139,6 +1133,9 @@ export function ReceiveReturn({
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
+  useEscapeKey(() => {
+    if (!busy) onClose();
+  });
 
   const assignmentItems: any[] = assignment.items || [];
   const outstanding = (item: any) =>
@@ -1194,9 +1191,7 @@ export function ReceiveReturn({
           Number(qty[item.id]) > outstanding(item),
       )
     ) {
-      toast.error(
-        "Return quantity must be between 1 and the available quantity",
-      );
+      toast.error("Return Qty must be between 1 and the On Hand quantity");
       return;
     }
     if (
@@ -1254,7 +1249,7 @@ export function ReceiveReturn({
             <div>
               <span className="text-xs text-slate-500">Model</span>
               <p className="font-semibold text-slate-900">
-                {assignment.model?.name || "—"}
+                {assignment.model?.name || "-"}
               </p>
             </div>
             <div>
@@ -1308,12 +1303,12 @@ export function ReceiveReturn({
                       {product?.itemName || "Product"}
                     </h3>
                     <p className="mt-1 text-xs text-slate-600">
-                      Product Code: <b>{product?.sn || "—"}</b> · Supplier Code:{" "}
-                      <b>{product?.supplierCode || "—"}</b>
+                      Product Code: <b>{product?.sn || "-"}</b> · Supplier Code:{" "}
+                      <b>{product?.supplierCode || "-"}</b>
                     </p>
                   </div>
                   <span className="rounded-lg bg-violet-50 px-3 py-2 text-xs font-bold text-violet-700">
-                    {items.length} assigned sizes
+                    {plural(items.length, "assigned size")}
                   </span>
                 </div>
                 <div className="overflow-x-auto">
@@ -1340,10 +1335,16 @@ export function ReceiveReturn({
                             className="whitespace-nowrap px-3 py-3"
                           >
                             {f.field?.name || f.fieldId}
-                            {f.field?.unit ? ` (${f.field.unit})` : ""}
+                            {f.field?.unit?.symbol ? ` (${f.field.unit.symbol})` : ""}
                           </th>
                         ))}
                         <th className="whitespace-nowrap px-3 py-3">Sent</th>
+                        <th className="whitespace-nowrap px-3 py-3">
+                          Returned
+                        </th>
+                        <th className="whitespace-nowrap px-3 py-3">
+                          On Hand
+                        </th>
                         <th className="whitespace-nowrap px-3 py-3">
                           Return Qty
                         </th>
@@ -1379,15 +1380,23 @@ export function ReceiveReturn({
                                 key={f.fieldId}
                                 className="px-3 py-3 text-slate-700"
                               >
-                                {(product?.measurements || []).find(
-                                  (m: any) =>
-                                    m.size === item.size &&
-                                    m.fieldId === f.fieldId,
-                                )?.value ?? "—"}
+                                {measurementText(
+                                  (product?.measurements || []).find(
+                                    (m: any) =>
+                                      m.size === item.size &&
+                                      m.fieldId === f.fieldId,
+                                  )?.value,
+                                ) || "-"}
                               </td>
                             ))}
                             <td className="px-3 py-3 font-semibold text-blue-600">
                               {item.sentQty}
+                            </td>
+                            <td className="px-3 py-3 font-semibold text-emerald-600">
+                              {returnQty(item)}
+                            </td>
+                            <td className="px-3 py-3 font-semibold text-orange-600">
+                              {remaining}
                             </td>
                             <td className="px-3 py-3">
                               <input
@@ -1400,10 +1409,14 @@ export function ReceiveReturn({
                                 onChange={(e) =>
                                   setQty((prev) => ({
                                     ...prev,
+                                    // Never more than what is still on hand.
                                     [item.id]:
                                       e.target.value === ""
                                         ? ""
-                                        : Number(e.target.value),
+                                        : Math.min(
+                                            remaining,
+                                            Number(e.target.value),
+                                          ),
                                   }))
                                 }
                                 aria-label={`Return quantity for ${item.size}`}
@@ -1440,21 +1453,26 @@ export function ReceiveReturn({
                   </table>
                 </div>
                 <div className="border-t border-slate-100 px-4 py-3 text-right text-xs font-semibold text-violet-700">
-                  {
+                  {plural(
                     items.filter(
                       (item: any) => selected[item.id] && outstanding(item) > 0,
-                    ).length
-                  }{" "}
-                  sizes selected ·{" "}
-                  {items.reduce(
-                    (sum: number, item: any) =>
-                      sum +
-                      (selected[item.id] && outstanding(item) > 0
-                        ? Number(qty[item.id] || 0)
-                        : 0),
-                    0,
+                    ).length,
+                    "size",
                   )}{" "}
-                  pcs to return
+                  selected ·{" "}
+                  {plural(
+                    items.reduce(
+                      (sum: number, item: any) =>
+                        sum +
+                        (selected[item.id] && outstanding(item) > 0
+                          ? Number(qty[item.id] || 0)
+                          : 0),
+                      0,
+                    ),
+                    "pc",
+                    "pcs",
+                  )}{" "}
+                  to return
                 </div>
               </section>
             );
@@ -1484,8 +1502,10 @@ export function ReceiveReturn({
         </div>
         <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white px-5 py-4 sm:px-7">
           <p className="text-sm font-semibold text-slate-700">
-            {chosen.length} selected sizes ·{" "}
-            <span className="text-violet-700">{totalPieces} return pieces</span>
+            {plural(chosen.length, "selected size")} ·{" "}
+            <span className="text-violet-700">
+              {plural(totalPieces, "return piece")}
+            </span>
           </p>
           <div className="flex gap-3">
             <button
@@ -1525,9 +1545,10 @@ export default function AssignmentsPage() {
       <ResourcePage
         entity="assignments"
         title="Model Assign"
+        createLabel="Model Assign"
         initial={{
           modelId: "",
-          sentDate: new Date().toISOString().slice(0, 10),
+          sentDate: localDateInput(),
           expectedReturnDate: "",
           notes: "",
           items: [],

@@ -36,7 +36,7 @@ function domainError(error: unknown) {
     DUPLICATE_RETURN_ITEM: ["Duplicate return item", 400],
     INVALID_ASSIGNMENT_ITEM: ["Item does not belong to this assignment", 400],
     RETURN_EXCEEDS_OUTSTANDING: [
-      "Return quantity exceeds outstanding quantity",
+      "Return Qty cannot be more than the On Hand quantity",
       400,
     ],
   };
@@ -111,12 +111,7 @@ export async function PATCH(req: NextRequest, { params }: Context) {
               ? new Date(input.expectedReturnDate)
               : null,
             notes: input.notes ?? null,
-            items: {
-              create: input.items.map((item) => ({
-                ...item,
-                dontWearQty: dontWearByItem.get(item.assignmentItemId) ?? 0,
-              })),
-            },
+            items: { create: input.items },
           },
           include: assignmentInclude,
         });

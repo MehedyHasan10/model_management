@@ -1,20 +1,41 @@
 "use client";
 import { Loader2, Save, X } from "lucide-react";
-import type { MeasurementField } from "./FieldsPage";
+import { useEscapeKey } from "@/lib/useEscapeKey";
+import type {
+  FieldErrors,
+  MeasurementField,
+  MeasurementUnit,
+} from "./FieldsPage";
+import { unitLabel } from "./FieldsPage";
 type Props = {
   field: MeasurementField;
+  units: MeasurementUnit[];
+  errors: FieldErrors;
   busy: boolean;
   onChange: (field: MeasurementField) => void;
+  onGoToUnits: () => void;
   onCancel: () => void;
   onSave: () => void;
 };
+const inputClass = (error?: string) =>
+  `mt-2 w-full rounded-xl border p-3 outline-none ${
+    error
+      ? "border-red-400 focus:border-red-500"
+      : "border-slate-200 focus:border-violet-500"
+  }`;
 export default function FieldFormModal({
   field,
+  units,
+  errors,
   busy,
   onChange,
+  onGoToUnits,
   onCancel,
   onSave,
 }: Props) {
+  useEscapeKey(() => {
+    if (!busy) onCancel();
+  });
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
       <div
@@ -43,6 +64,7 @@ export default function FieldFormModal({
           </button>
         </div>
         <form
+          noValidate
           onSubmit={(e) => {
             e.preventDefault();
             onSave();
@@ -54,24 +76,56 @@ export default function FieldFormModal({
               autoFocus
               required
               maxLength={100}
-              className="mt-2 w-full rounded-xl border border-slate-200 p-3 outline-none focus:border-violet-500"
+              aria-invalid={Boolean(errors.name)}
+              aria-describedby={errors.name ? "field-name-error" : undefined}
+              className={inputClass(errors.name)}
               placeholder="e.g. Chest"
               value={field.name}
               onChange={(e) => onChange({ ...field, name: e.target.value })}
             />
           </label>
+          {errors.name && (
+            <p id="field-name-error" className="mt-1.5 text-xs text-red-600">
+              {errors.name}
+            </p>
+          )}
           <label className="mt-5 block text-sm font-semibold text-slate-700">
             Measurement Unit <span className="text-red-500">*</span>
-            <select
-              required
-              className="mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 outline-none focus:border-violet-500"
-              value={field.unit || "in"}
-              onChange={(e) => onChange({ ...field, unit: e.target.value })}
-            >
-              <option value="in">Inches (in)</option>
-              <option value="cm">Centimeters (cm)</option>
-            </select>
+            {units.length > 0 ? (
+              <select
+                required
+                aria-invalid={Boolean(errors.unitId)}
+                className={`${inputClass(errors.unitId)} bg-white`}
+                value={field.unitId}
+                onChange={(e) =>
+                  onChange({ ...field, unitId: e.target.value })
+                }
+              >
+                {!units.some((u) => u.id === field.unitId) && (
+                  <option value="">Select a unit</option>
+                )}
+                {units.map((unit) => (
+                  <option key={unit.id} value={unit.id}>
+                    {unitLabel(unit)}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="mt-2 block rounded-xl border border-dashed border-slate-300 p-3 font-normal text-slate-500">
+                No units yet.{" "}
+                <button
+                  type="button"
+                  className="font-semibold text-violet-700 underline"
+                  onClick={onGoToUnits}
+                >
+                  Add one in the Units tab
+                </button>
+              </span>
+            )}
           </label>
+          {errors.unitId && (
+            <p className="mt-1.5 text-xs text-red-600">{errors.unitId}</p>
+          )}
           <div className="mt-7 flex justify-end gap-3 border-t border-slate-100 pt-5">
             <button
               type="button"
@@ -83,7 +137,7 @@ export default function FieldFormModal({
             </button>
             <button
               type="submit"
-              disabled={busy}
+              disabled={busy || units.length === 0}
               className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
             >
               {busy ? <Loader2 size={17} className="animate-spin" /> : <Save size={17} />}

@@ -348,9 +348,9 @@ export default function CategoriesPage() {
 
                 <option value="oldest">Oldest first</option>
 
-                <option value="az">Name A–Z</option>
+                <option value="az">Name A-Z</option>
 
-                <option value="za">Name Z–A</option>
+                <option value="za">Name Z-A</option>
               </select>
             </div>
 
@@ -449,7 +449,7 @@ export default function CategoriesPage() {
                     <td className="px-6 py-4 text-slate-500">
                       {row.createdAt
                         ? new Date(row.createdAt).toLocaleDateString()
-                        : "—"}
+                        : "-"}
                     </td>
 
                     <td className="px-6 py-4">

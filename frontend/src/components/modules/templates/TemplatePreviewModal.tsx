@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
 import { Printer, X, ClipboardList } from "lucide-react";
-import type { FieldOption, QualityChecks } from "./TemplateFormModal";
+import { checkLabels, type FieldOption, type QualityChecks } from "./TemplateFormModal";
+import { useEscapeKey } from "@/lib/useEscapeKey";
 
 type TemplatePreview = {
   id: string;
@@ -12,25 +12,18 @@ type TemplatePreview = {
   sizes?: string[];
   fields?: Array<{ fieldId?: string; field?: { id?: string; name?: string }; name?: string }>;
   fieldIds?: string[];
-  qualityChecks?: Partial<QualityChecks> & { noMeasurementFieldId?: string; noMeasurementText?: string };
+  qualityChecks?: Partial<QualityChecks>;
+  noMeasurementFieldId?: string | null;
+  noMeasurementText?: string | null;
 };
-const checks: Array<[keyof QualityChecks, string]> = [
-  ["colorGuarantee", "Color Guarantee"],
-  ["shrinkResistance", "Shrink Resistance"],
-  ["bubblingResistance", "Bubbling Resistance"],
-  ["printEmbroideryQuality", "Print / Embroidery Quality"],
-];
+const checks = Object.entries(checkLabels) as Array<[keyof QualityChecks, string]>;
 
 export default function TemplatePreviewModal({ template, fields, onClose }: {
   template: TemplatePreview;
   fields: FieldOption[];
   onClose: () => void;
 }) {
-  useEffect(() => {
-    const handle = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", handle);
-    return () => window.removeEventListener("keydown", handle);
-  }, [onClose]);
+  useEscapeKey(onClose);
 
   const linked = Array.isArray(template.fields) ? template.fields : [];
   const ids = linked.length ? linked.map((f) => f.fieldId || f.field?.id || "") : template.fieldIds || [];
@@ -65,8 +58,8 @@ export default function TemplatePreviewModal({ template, fields, onClose }: {
                   <th className="w-1/4 border-2 border-slate-800 bg-slate-200 px-2 py-3 font-extrabold">SIZE TAG</th>
                   <th className="border-2 border-slate-800 bg-slate-200 px-2 py-3 font-extrabold">TEXT</th>
                 </tr></thead><tbody><tr>
-                  <th className="border border-slate-800 bg-slate-50 px-3 py-4 font-bold">{byId.get(template.qualityChecks?.noMeasurementFieldId || "") || "No Size"}</th>
-                  <td className="whitespace-pre-wrap break-words border border-slate-800 px-3 py-4 text-left">{template.qualityChecks?.noMeasurementText || "—"}</td>
+                  <th className="border border-slate-800 bg-slate-50 px-3 py-4 font-bold">{byId.get(template.noMeasurementFieldId || "") || "No Size"}</th>
+                  <td className="whitespace-pre-wrap break-words border border-slate-800 px-3 py-4 text-left">{template.noMeasurementText || "-"}</td>
                 </tr></tbody></table>
               </>
             ) : (

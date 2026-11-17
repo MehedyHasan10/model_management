@@ -42,14 +42,14 @@ export default function SupplierDetails({ supplier, onClose }: Props) {
 
   const rows: [string, string][] = [
     ["Name", supplier.name],
-    ["Contact Person", supplier.contactPerson || "—"],
-    ["Phone", supplier.phone || "—"],
-    ["Email", supplier.email || "—"],
-    ["Address", supplier.address || "—"],
-    ["Notes", supplier.notes || "—"],
+    ["Contact Person", supplier.contactPerson || "-"],
+    ["Phone", supplier.phone || "-"],
+    ["Email", supplier.email || "-"],
+    ["Address", supplier.address || "-"],
+    ["Notes", supplier.notes || "-"],
     [
       "Created",
-      supplier.createdAt ? new Date(supplier.createdAt).toLocaleString() : "—",
+      supplier.createdAt ? new Date(supplier.createdAt).toLocaleString() : "-",
     ],
   ];
 

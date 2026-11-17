@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
+import { fieldWithUnit } from "@/lib/measurement";
 
 export function assignmentJson(data: unknown, status = 200) {
   return NextResponse.json(data, {
@@ -46,14 +47,23 @@ export function assignmentError(error: unknown) {
 export const assignmentInclude = {
   model: true,
   createdBy: { select: { id: true, name: true } },
+  contentDoneBy: { select: { id: true, name: true } },
   items: {
     include: {
       product: {
         include: {
           category: true,
-          template: true,
+          supplier: { select: { id: true, name: true, code: true } },
+          template: {
+            include: {
+              fields: {
+                include: { field: fieldWithUnit },
+                orderBy: { order: "asc" as const },
+              },
+            },
+          },
           images: true,
-          measurements: { include: { field: true } },
+          measurements: { include: { field: fieldWithUnit } },
         },
       },
       returnItems: true,

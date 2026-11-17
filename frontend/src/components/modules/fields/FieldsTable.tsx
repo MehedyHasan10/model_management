@@ -1,6 +1,7 @@
 "use client";
 import { Pencil, Ruler, Trash2 } from "lucide-react";
 import type { MeasurementField } from "./FieldsPage";
+import { unitLabel } from "./FieldsPage";
 type Props = {
   rows: MeasurementField[];
   canEdit: boolean;
@@ -41,11 +42,7 @@ export default function FieldsTable({
               </td>
               <td className="px-6 py-4">
                 <span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700">
-                  {r.unit === "cm"
-                    ? "Centimeters (cm)"
-                    : r.unit === "in"
-                      ? "Inches (in)"
-                      : r.unit}
+                  {unitLabel(r.unit)}
                 </span>
               </td>
               <td className="px-6 py-4">

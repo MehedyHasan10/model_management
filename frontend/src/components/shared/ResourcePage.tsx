@@ -30,11 +30,14 @@ import {
 
 import { useAccount } from "../Shell";
 
+import { compressToWebp, uploadImage } from "@/lib/image";
 import { api, saveEntity, deleteEntity } from "@/lib/client-api";
+import { plural } from "@/lib/format";
 
 import Pagination from "./Pagination";
 
 import DeleteConfirmModal from "./DeleteConfirmModal";
+import { EscapeKey } from "@/lib/useEscapeKey";
 
 export type FormProps = {
   value: any;
@@ -76,6 +79,9 @@ type Props = {
   validate?: (value: any, data: any[]) => string | undefined;
 
   prepareEdit?: (row: any) => any;
+
+  /** Text of the header button that opens the create form. */
+  createLabel?: string;
 };
 
 function structuredCloneSafe<T>(value: T): T {
@@ -102,6 +108,8 @@ export default function ResourcePage({
   rowActions,
 
   prepareEdit,
+
+  createLabel = "Create New",
 }: Props) {
   const account = useAccount();
 
@@ -286,28 +294,9 @@ export default function ResourcePage({
   };
 
   async function upload(file: File): Promise<void> {
-    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
-      toast.error("Only PNG, JPG or WebP images are allowed");
-
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Maximum original image size: 5 MB");
-
-      return;
-    }
-
     try {
-      const formData = new FormData();
-
-      formData.append("file", file);
-
-      const result = await api<{ url: string }>("uploads", {
-        method: "POST",
-
-        body: formData,
-      });
+      // Same compression and upload as the shared ImageUpload component.
+      const result = await uploadImage(await compressToWebp(file));
 
       setEditing((previous: any) => {
         if (!previous) return previous;
@@ -648,7 +637,7 @@ export default function ResourcePage({
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 font-semibold text-white shadow-sm transition hover:bg-violet-700"
           >
             <Plus size={17} />
-            Create New
+            {createLabel}
           </button>
         )}
       </div>
@@ -816,7 +805,7 @@ export default function ResourcePage({
 
               {!isAssignmentDirectory && (
                 <span className="text-sm text-slate-500">
-                  {filtered.length} records
+                  {plural(filtered.length, "record")}
                 </span>
               )}
             </div>
@@ -929,6 +918,7 @@ export default function ResourcePage({
         Form &&
         createPortal(
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3 sm:p-4">
+            <EscapeKey onEscape={() => !busy && setEditing(null)} />
             <div
               className={`flex max-h-[92vh] w-full flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ${
                 entity === "products" ||

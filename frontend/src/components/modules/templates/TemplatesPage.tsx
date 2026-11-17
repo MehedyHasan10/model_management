@@ -24,6 +24,8 @@ import { useAccount } from "@/components/Shell";
 
 import { deleteEntity, saveEntity } from "@/lib/client-api";
 
+import { plural } from "@/lib/format";
+
 import Pagination from "@/components/shared/Pagination";
 
 import DeleteConfirmModal from "@/components/shared/DeleteConfirmModal";
@@ -37,6 +39,7 @@ import TemplateFormModal, {
   defaultDraft,
   normalizeDraft,
   isNoMeasurement,
+  pickQualityChecks,
 } from "./TemplateFormModal";
 
 type Template = TemplateDraft & {
@@ -76,7 +79,7 @@ type TemplateResponse = PaginatedResponse<Template> & {
 };
 
 const dateOf = (value?: string) =>
-  value ? new Date(value).toLocaleDateString() : "—";
+  value ? new Date(value).toLocaleDateString() : "-";
 
 const statusColor: Record<string, string> = {
   ACTIVE: "bg-emerald-50 text-emerald-700",
@@ -435,7 +438,7 @@ export default function TemplatesPage() {
   }, [fields]);
 
   const getNoMeasurementSize = (row: Template) => {
-    const fieldId = row.qualityChecks?.noMeasurementFieldId;
+    const fieldId = row.noMeasurementFieldId;
 
     return fields.find((field) => field.id === fieldId)?.name || "No Size";
   };
@@ -510,11 +513,9 @@ export default function TemplatesPage() {
         name,
         sizes: none ? [] : editing.sizes,
         fieldIds: none ? [] : editing.fieldIds,
-        qualityChecks: {
-          ...(editing.qualityChecks || {}),
-          noMeasurementFieldId: none ? noMeasurementFieldId : "",
-          noMeasurementText: none ? noMeasurementText : "",
-        },
+        qualityChecks: pickQualityChecks(editing.qualityChecks),
+        noMeasurementFieldId: none ? noMeasurementFieldId || null : null,
+        noMeasurementText: none ? noMeasurementText || null : null,
       });
 
       toast.success(editing.id ? "Template updated" : "Template created");
@@ -706,9 +707,9 @@ export default function TemplatesPage() {
 
                 <option value="oldest">Oldest first</option>
 
-                <option value="az">Name A–Z</option>
+                <option value="az">Name A-Z</option>
 
-                <option value="za">Name Z–A</option>
+                <option value="za">Name Z-A</option>
               </select>
             </div>
 
@@ -825,7 +826,7 @@ export default function TemplatesPage() {
                         categories.find(
                           (category) => category.id === row.categoryId,
                         )?.name ||
-                        "—"}
+                        "-"}
                     </td>
 
                     <td className="px-6 py-4 text-slate-600">
@@ -834,13 +835,13 @@ export default function TemplatesPage() {
                           {getNoMeasurementSize(row)}
                         </span>
                       ) : (
-                        (row.sizes || []).join(", ") || "—"
+                        (row.sizes || []).join(", ") || "-"
                       )}
                     </td>
 
                     <td className="px-6 py-4 text-slate-600">
                       {noMeasurement(row)
-                        ? "—"
+                        ? "-"
                         : (row.fields?.length ?? row.fieldIds?.length ?? 0)}
                     </td>
 
@@ -894,9 +895,10 @@ export default function TemplatesPage() {
                 <p className="mt-2 text-xs text-slate-500">
                   {noMeasurement(row)
                     ? getNoMeasurementSize(row)
-                    : `${
-                        row.fields?.length ?? row.fieldIds?.length ?? 0
-                      } fields · ${(row.sizes || []).length} sizes`}
+                    : `${plural(
+                        row.fields?.length ?? row.fieldIds?.length ?? 0,
+                        "field",
+                      )} · ${plural((row.sizes || []).length, "size")}`}
                 </p>
 
                 <div className="mt-4 flex items-center justify-between">

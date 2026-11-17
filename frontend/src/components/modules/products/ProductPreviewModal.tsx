@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo, useRef } from "react";
 import { Printer, X } from "lucide-react";
+import { useEscapeKey } from "@/lib/useEscapeKey";
+import { measurementText } from "@/lib/measurement";
+import { EMPTY } from "@/lib/format";
 
-type Product = {
+export type PreviewProduct = {
   sn: string;
   code?: string | null;
   itemName: string;
@@ -11,13 +14,12 @@ type Product = {
   template?: {
     name: string;
     sizes?: string[];
-    fields?: { fieldId: string; field?: { name: string; unit?: string } }[];
-    qualityChecks?: {
-      noMeasurementFieldId?: string;
-      noMeasurementText?: string;
-    };
+    fields?: { fieldId: string; field?: { name: string; unit?: { name: string; symbol: string } | null } }[];
+    noMeasurementFieldId?: string | null;
+    noMeasurementText?: string | null;
   };
   pp?: string | null;
+  sp?: string | null;
   supplierCode?: string | null;
   supplier?: { name: string } | null;
   wp?: string | null;
@@ -28,7 +30,7 @@ type Product = {
   measurements?: Array<{
     size: string;
     fieldId: string;
-    value: number | string;
+    value: number | string | null;
   }>;
 };
 
@@ -62,7 +64,7 @@ export default function ProductPreviewModal({
   product,
   onClose,
 }: {
-  product: Product;
+  product: PreviewProduct;
   onClose: () => void;
 }) {
   const printingRef = useRef(false);
@@ -74,13 +76,28 @@ export default function ProductPreviewModal({
     [product.images],
   );
   const fields = product.template?.fields || [];
-  const sizes = product.template?.sizes?.length
+  const allSizes = product.template?.sizes?.length
     ? product.template.sizes
     : Array.from(
         new Set(
           (product.measurements || []).map((measurement) => measurement.size),
         ),
       );
+  const valueFor = (size: string, fieldId: string) =>
+    measurementText(
+      product.measurements?.find(
+        (measurement) =>
+          measurement.size === size && measurement.fieldId === fieldId,
+      )?.value,
+    );
+  // Only sizes with at least one value are shown (on screen and in print).
+  const sizes = allSizes.filter((size) =>
+    fields.some((field) => valueFor(size, field.fieldId) !== ""),
+  );
+  const noMeasurementTemplate =
+    !!product.template &&
+    !(product.template.sizes?.length ?? 0) &&
+    fields.length === 0;
 
   const details = [
     ["Code", product.sn],
@@ -89,18 +106,13 @@ export default function ProductPreviewModal({
     ["Category", product.category?.name],
     ["Template", product.template?.name],
     ["PP", product.pp],
+    ["SP", product.sp],
     ["WP", product.wp],
     ["Fabric", product.fabric],
     ["Notes", product.notes],
   ] as const;
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
+  useEscapeKey(onClose);
 
   const print = async () => {
     if (printingRef.current) return;
@@ -224,7 +236,7 @@ export default function ProductPreviewModal({
                     {label}
                   </div>
                   <div className="print-detail-value mt-1 break-words text-sm font-semibold text-slate-800">
-                    {value || "—"}
+                    {value?.trim() || EMPTY}
                   </div>
                 </div>
               ))}
@@ -251,7 +263,7 @@ export default function ProductPreviewModal({
             <h2 className="print-section mb-3 mt-5 text-base font-bold text-slate-900">
               Size Measurements
             </h2>
-            {sizes.length === 0 && fields.length === 0 && product.template ? (
+            {noMeasurementTemplate && product.template ? (
               <div className="print-table-wrap overflow-x-auto rounded-lg border border-slate-200">
                 <table className="print-table w-full border-collapse text-sm">
                   <thead>
@@ -269,8 +281,8 @@ export default function ProductPreviewModal({
                       </td>
                       <td className="whitespace-pre-wrap border border-slate-200 p-2">
                         {product.noSizeText ||
-                          product.template.qualityChecks?.noMeasurementText ||
-                          "—"}
+                          product.template.noMeasurementText ||
+                          EMPTY}
                       </td>
                     </tr>
                   </tbody>
@@ -290,7 +302,7 @@ export default function ProductPreviewModal({
                           key={field.fieldId}
                         >
                           {field.field?.name || field.fieldId}
-                          {field.field?.unit ? ` (${field.field.unit})` : ""}
+                          {field.field?.unit?.symbol ? ` (${field.field.unit.symbol})` : ""}
                         </th>
                       ))}
                     </tr>
@@ -306,11 +318,7 @@ export default function ProductPreviewModal({
                             className="border border-slate-200 p-2"
                             key={field.fieldId}
                           >
-                            {product.measurements?.find(
-                              (measurement) =>
-                                measurement.size === size &&
-                                measurement.fieldId === field.fieldId,
-                            )?.value ?? "—"}
+                            {valueFor(size, field.fieldId) || EMPTY}
                           </td>
                         ))}
                       </tr>
@@ -320,7 +328,7 @@ export default function ProductPreviewModal({
               </div>
             ) : (
               <p className="print-empty text-sm text-slate-500">
-                No measurements
+                No measurements added yet.
               </p>
             )}
           </div>

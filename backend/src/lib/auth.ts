@@ -46,6 +46,14 @@ export async function can(
     x.role.permissions.some((p) => p.permission.key === key),
   );
 }
+/** Admins are users with the "Super Admin" or "Admin" role. */
+export function isAdmin(
+  user: NonNullable<Awaited<ReturnType<typeof currentUser>>>,
+) {
+  return user.roles.some((x) =>
+    ["super admin", "admin"].includes(x.role.name.trim().toLowerCase()),
+  );
+}
 export function publicUser(
   user: NonNullable<Awaited<ReturnType<typeof currentUser>>>,
 ) {

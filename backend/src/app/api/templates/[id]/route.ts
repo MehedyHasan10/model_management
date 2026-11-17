@@ -4,7 +4,10 @@ import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { currentUser, can } from "@/lib/auth";
 import { fail, audit } from "@/lib/common";
-import { templateInputSchema } from "@/lib/template-validation";
+import {
+  cleanQualityChecks,
+  templateInputSchema,
+} from "@/lib/template-validation";
 
 export const runtime = "nodejs";
 type Ctx = { params: Promise<{ id: string }> };
@@ -47,21 +50,25 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     const input = templateInputSchema.parse(raw);
     const noMeasurement =
       input.sizes.length === 0 && input.fieldIds.length === 0;
-    const extra = noMeasurement
-      ? {
-          noMeasurementFieldId:
-            typeof raw.noMeasurementFieldId === "string"
-              ? raw.noMeasurementFieldId
-              : "",
-          noMeasurementText:
-            typeof raw.noMeasurementText === "string"
-              ? raw.noMeasurementText.slice(0, 2000)
-              : "",
-        }
-      : {};
-    if (noMeasurement && extra.noMeasurementFieldId) {
+    // Older clients sent these inside qualityChecks; accept that as a fallback.
+    const legacy = (raw?.qualityChecks ?? {}) as Record<string, unknown>;
+    const noMeasurementFieldId = noMeasurement
+      ? input.noMeasurementFieldId ||
+        (typeof legacy.noMeasurementFieldId === "string"
+          ? legacy.noMeasurementFieldId
+          : "") ||
+        null
+      : null;
+    const noMeasurementText = noMeasurement
+      ? (input.noMeasurementText ??
+          (typeof legacy.noMeasurementText === "string"
+            ? legacy.noMeasurementText.slice(0, 2000)
+            : "")) ||
+        null
+      : null;
+    if (noMeasurementFieldId) {
       const field = await db.measurementField.findUnique({
-        where: { id: extra.noMeasurementFieldId },
+        where: { id: noMeasurementFieldId },
       });
       if (
         !field ||
@@ -77,10 +84,9 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
         categoryId: input.categoryId,
         status: input.status,
         sizes: input.sizes,
-        qualityChecks: {
-          ...(input.qualityChecks ?? {}),
-          ...extra,
-        } as Prisma.InputJsonValue,
+        qualityChecks: cleanQualityChecks(input.qualityChecks),
+        noMeasurementFieldId,
+        noMeasurementText,
         fields: {
           deleteMany: {},
           create: input.fieldIds.map((fieldId, order) => ({ fieldId, order })),

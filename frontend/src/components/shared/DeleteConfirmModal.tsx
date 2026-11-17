@@ -1,16 +1,24 @@
 "use client";
 import { AlertTriangle, X, Trash2 } from "lucide-react";
+import { useEscapeKey } from "@/lib/useEscapeKey";
 export default function DeleteConfirmModal({
   name,
+  title = "Delete record?",
+  message = "This action cannot be undone. Records linked to existing data may be protected by the server.",
   busy,
   onCancel,
   onConfirm,
 }: {
   name: string;
+  title?: string;
+  message?: string;
   busy: boolean;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  useEscapeKey(() => {
+    if (!busy) onCancel();
+  });
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4"
@@ -23,7 +31,7 @@ export default function DeleteConfirmModal({
         aria-label="Confirm deletion"
       >
         <div className="mb-5 flex items-center justify-between gap-3 [&_h2]:text-xl [&_h2]:font-bold [&_button]:rounded-lg [&_button]:p-2 [&_button:hover]:bg-slate-100">
-          <h2>Delete record?</h2>
+          <h2>{title}</h2>
           <button aria-label="Close" onClick={onCancel}>
             <X />
           </button>
@@ -39,10 +47,7 @@ export default function DeleteConfirmModal({
           <AlertTriangle color="#dc2626" />
           <div>
             <strong>{name}</strong>
-            <p>
-              This action cannot be undone. Records linked to existing data may
-              be protected by the server.
-            </p>
+            <p>{message}</p>
           </div>
         </div>
         <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-5">

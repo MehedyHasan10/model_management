@@ -328,9 +328,9 @@ export default function SupplierList() {
 
                 <option value="oldest">Oldest First</option>
 
-                <option value="name_asc">Name A–Z</option>
+                <option value="name_asc">Name A-Z</option>
 
-                <option value="name_desc">Name Z–A</option>
+                <option value="name_desc">Name Z-A</option>
               </select>
             </div>
 
@@ -448,19 +448,19 @@ export default function SupplierList() {
                       {/* CONTACT PERSON */}
 
                       <td className="px-4 py-4 text-center text-slate-600">
-                        {item.contactPerson || "—"}
+                        {item.contactPerson || "-"}
                       </td>
 
                       {/* PHONE */}
 
                       <td className="px-4 py-4 text-center text-slate-600">
-                        {item.phone || "—"}
+                        {item.phone || "-"}
                       </td>
 
                       {/* EMAIL */}
 
                       <td className="px-4 py-4 text-center text-slate-600">
-                        {item.email || "—"}
+                        {item.email || "-"}
                       </td>
 
                       {/* ADDRESS */}
@@ -469,7 +469,7 @@ export default function SupplierList() {
                         title={item.address || ""}
                         className="max-w-[220px] truncate px-4 py-4 text-center text-slate-600"
                       >
-                        {item.address || "—"}
+                        {item.address || "-"}
                       </td>
 
                       {/* STATUS */}

@@ -19,6 +19,7 @@ import ResourcePage, { type FormProps } from "@/components/shared/ResourcePage";
 import { TextField } from "@/components/shared/FormFields";
 
 import { api } from "@/lib/client-api";
+import { plural } from "@/lib/format";
 
 const modules = [
   "dashboard",
@@ -390,7 +391,7 @@ function Form({ value, change }: FormProps) {
             </p>
 
             <p className="text-xs font-semibold text-slate-600">
-              {selectedCount} permissions enabled
+              {plural(selectedCount, "permission")} enabled
             </p>
           </div>
         </div>

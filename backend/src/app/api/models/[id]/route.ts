@@ -4,35 +4,14 @@ import { db } from "@/lib/db";
 import { currentUser, can } from "@/lib/auth";
 import { fail, audit } from "@/lib/common";
 import { Prisma } from "@prisma/client";
+import { modelPhotoSchema } from "@/lib/productImageValidation";
 
 const entity = "models";
 const schema = z
   .object({
     name: z.string().trim().min(2).max(150),
     phone: z.string().max(30).nullish(),
-    photoUrl: z
-      .union([
-        z.literal(""),
-        z.string().url().max(2048),
-        z
-          .string()
-          .regex(/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/)
-          .superRefine((value, ctx) => {
-            const base64 = value.slice("data:image/jpeg;base64,".length);
-            const padding = base64.endsWith("==")
-              ? 2
-              : base64.endsWith("=")
-                ? 1
-                : 0;
-            if ((base64.length * 3) / 4 - padding > 500 * 1024) {
-              ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: "Model photo must be 500 KB or smaller",
-              });
-            }
-          }),
-      ])
-      .nullish(),
+    photoUrl: modelPhotoSchema,
     notes: z.string().max(5000).nullish(),
     active: z.boolean(),
   })

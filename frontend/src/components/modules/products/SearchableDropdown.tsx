@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, Search } from "lucide-react";
+import { useEscapeKey } from "@/lib/useEscapeKey";
 
 type Option = { id: string; name: string };
 export default function SearchableDropdown({
@@ -23,6 +24,7 @@ export default function SearchableDropdown({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const ref = useRef<HTMLDivElement>(null);
+  useEscapeKey(() => setOpen(false), open);
   useEffect(() => {
     const close = (event: MouseEvent) => {
       if (!ref.current?.contains(event.target as Node)) setOpen(false);

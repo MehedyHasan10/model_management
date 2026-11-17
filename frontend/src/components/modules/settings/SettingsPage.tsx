@@ -58,7 +58,7 @@ export default function SettingsPage() {
   }, [loadSettings]);
 
   const preview = useMemo(() => {
-    if (!settings) return "—";
+    if (!settings) return "-";
 
     const prefix = settings.prefix || "";
     const digits = Number(settings.digits) || 1;

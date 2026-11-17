@@ -1,3 +1,14 @@
+/** Error thrown by api(); `field` names the input the server rejected, if any. */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    public field?: string,
+  ) {
+    super(message);
+  }
+}
+
 export async function api<T = any>(
   path: string,
   options?: RequestInit,
@@ -22,12 +33,14 @@ export async function api<T = any>(
           : [],
       ),
     ];
-    throw new Error(
+    throw new ApiError(
       body?.error && body.error !== "Validation failed"
         ? body.error
         : messages.length
           ? messages.join("; ")
           : `Request failed (${response.status})`,
+      response.status,
+      typeof body?.field === "string" ? body.field : undefined,
     );
   }
   return body as T;

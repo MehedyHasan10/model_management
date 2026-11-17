@@ -38,6 +38,7 @@ model User {
  overrides UserPermissionOverride[]
  createdAssignments Assignment[] @relation("AssignmentCreator")
  receivedReturns ReturnTransaction[] @relation("ReturnReceiver")
+ contentDoneAssignments Assignment[] @relation("AssignmentContentDoneBy")
  auditLogs AuditLog[]
  createdAt DateTime @default(now())
  updatedAt DateTime @updatedAt
@@ -96,11 +97,22 @@ model MeasurementField {
   name String
   categoryId String?
   category GarmentCategory? @relation(fields:[categoryId],references:[id],onDelete:SetNull)
-  unit String @default("in")
+  unitId String
+  unit MeasurementUnit @relation(fields:[unitId],references:[id])
   order Int @default(0)
   templateFields TemplateField[]
   values MeasurementValue[]
   @@unique([name,categoryId])
+  @@index([unitId])
+}
+// Name and symbol are also unique case-insensitively via LOWER() indexes in the migration.
+model MeasurementUnit {
+  id String @id @default(cuid())
+  name String
+  symbol String
+  fields MeasurementField[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 model MeasurementTemplate {
   id String @id @default(cuid())
@@ -110,6 +122,9 @@ model MeasurementTemplate {
   status TemplateStatus @default(DRAFT)
   sizes Json
   qualityChecks Json?
+  // No Measurement templates: which size tag to show and its default text.
+  noMeasurementFieldId String?
+  noMeasurementText String? @db.Text
   fields TemplateField[]
   products Product[]
   createdAt DateTime @default(now())
@@ -143,6 +158,7 @@ model Product {
   templateId String?
   template MeasurementTemplate? @relation(fields:[templateId],references:[id])
   pp String?
+  sp String?
   spn String?
   wp String?
   fabric String?
@@ -169,7 +185,8 @@ model MeasurementValue {
   size String
   fieldId String
   field MeasurementField @relation(fields:[fieldId],references:[id])
-  value Decimal @db.Decimal(10,2)
+  // A single number (38, 38.5) or a range (34-38), shown exactly as saved.
+  value String
   @@unique([productId,size,fieldId])
 }
 model ModelProfile {
@@ -195,6 +212,11 @@ model Assignment {
   expectedReturnDate DateTime?
   status AssignmentStatus @default(ISSUED)
   notes String?
+  // Marked from the CONTENT column; only admins can undo it.
+  contentDone Boolean @default(false)
+  contentDoneAt DateTime?
+  contentDoneById String?
+  contentDoneBy User? @relation("AssignmentContentDoneBy",fields:[contentDoneById],references:[id],onDelete:SetNull)
   items AssignmentItem[]
   returns ReturnTransaction[]
   createdAt DateTime @default(now())

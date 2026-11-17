@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { currentUser, can } from "@/lib/auth";
 import { fail } from "@/lib/common";
+import { fieldWithUnit } from "@/lib/measurement";
 import {
   GET as dispatchGET,
   POST as dispatchPOST,
@@ -63,8 +64,10 @@ export async function GET(req: NextRequest) {
           },
           {
             unit: {
-              contains: search,
-              mode: "insensitive",
+              OR: [
+                { name: { contains: search, mode: "insensitive" } },
+                { symbol: { contains: search, mode: "insensitive" } },
+              ],
             },
           },
         ],
@@ -89,6 +92,7 @@ export async function GET(req: NextRequest) {
         orderBy,
         skip: (page - 1) * limit,
         take: limit,
+        ...fieldWithUnit,
       }),
 
       db.measurementField.count({

@@ -3,37 +3,73 @@ name: Model Management Auto Deploy
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
 
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: model-management-production
+  cancel-in-progress: false
+
 jobs:
   deploy:
+    name: Deploy to Contabo VPS
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy to Contabo VPS
+      - name: Deploy Frontend, Backend and Database
         uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_KEY }}
+          port: 22
+          command_timeout: 30m
           script: |
-            set -e
+            set -eu
+
+            echo "Starting deployment..."
+
             cd /var/www/model-management
 
+            echo "Pulling latest code..."
             git pull --ff-only origin main
 
+            echo "Installing backend dependencies..."
             cd backend
             npm ci
+
+            echo "Generating Prisma Client..."
             npx prisma generate
+
+            echo "Checking database migrations..."
+            npx prisma migrate status
+
+            echo "Building backend..."
             npm run build
 
+            echo "Installing frontend dependencies..."
             cd ../frontend
             npm ci
+
+            echo "Building frontend..."
             npm run build
 
-            pm2 restart model-management-api
-            pm2 restart model-management-web
+            echo "Applying database migrations..."
+            cd ../backend
+            npx prisma migrate deploy
 
-            echo "Deployment successful!"
+            echo "Restarting backend..."
+            pm2 restart model-management-api --update-env
+
+            echo "Restarting frontend..."
+            pm2 restart model-management-web --update-env
+
+            echo "Saving PM2 configuration..."
+            pm2 save
+
+            echo "Deployment completed successfully!"

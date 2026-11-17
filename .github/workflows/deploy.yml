@@ -32,44 +32,54 @@ jobs:
           script: |
             set -eu
 
-            echo "Starting deployment..."
+            echo "Starting Model Management deployment..."
 
+            # Go to project directory
             cd /var/www/model-management
 
-            echo "Pulling latest code..."
+            # Pull latest code
+            echo "Pulling latest GitHub code..."
             git pull --ff-only origin main
 
+            # Install backend dependencies
             echo "Installing backend dependencies..."
             cd backend
             npm ci
 
+            # Generate Prisma Client
             echo "Generating Prisma Client..."
             npx prisma generate
 
-            echo "Checking database migrations..."
-            npx prisma migrate status
-
-            echo "Building backend..."
-            npm run build
-
+            # Install frontend dependencies
             echo "Installing frontend dependencies..."
             cd ../frontend
             npm ci
 
-            echo "Building frontend..."
+            # Build backend
+            echo "Building backend..."
+            cd ../backend
             npm run build
 
-            echo "Applying database migrations..."
+            # Build frontend
+            echo "Building frontend..."
+            cd ../frontend
+            npm run build
+
+            # Apply pending database migrations
+            echo "Applying Prisma database migrations..."
             cd ../backend
             npx prisma migrate deploy
 
-            echo "Restarting backend..."
+            # Restart backend
+            echo "Restarting backend API..."
             pm2 restart model-management-api --update-env
 
+            # Restart frontend
             echo "Restarting frontend..."
             pm2 restart model-management-web --update-env
 
-            echo "Saving PM2 configuration..."
+            # Save PM2 configuration
+            echo "Saving PM2 processes..."
             pm2 save
 
-            echo "Deployment completed successfully!"
+            echo "Model Management deployment successful!"

@@ -7,7 +7,7 @@ export const BULK_MAX_BYTES = 5 * 1024 * 1024;
 const DEFAULT_SUPPLIER_START = 1001;
 const MAX_SUPPLIER_NUMBER = 99_999_999;
 
-/** Sample/upload columns. CODE (product SN) is always auto-generated; any value typed there is ignored. */
+/** Sample/upload columns. A typed CODE (product SN) is kept; a blank one comes from Code Settings. */
 export const BULK_COLUMNS = [
   { key: "code", header: "CODE", width: 12 },
   { key: "supplierCode", header: "SUPPLIER CODE", width: 18 },
@@ -123,8 +123,9 @@ export async function parseBulkWorkbook(
 
 export type PlannedRow = {
   row: number;
-  /** Product code (SN) this row will get; empty for rows with errors. */
+  /** Product code (SN) this row will get: the typed CODE, or the next from Code Settings. */
   code: string;
+  autoCode: boolean;
   supplierCode: string;
   autoSupplierCode: boolean;
   supplierName: string;
@@ -177,9 +178,11 @@ export async function planBulkImport(client: Client, input: BulkInputRow[]) {
 
   const rows: PlannedRow[] = input.map((r) => {
     const errors: string[] = [];
+    const typedCode = r.code.toUpperCase().replace(/\s+/g, "");
     const out: PlannedRow = {
       row: r.row,
-      code: "",
+      code: typedCode,
+      autoCode: !typedCode,
       supplierCode: r.supplierCode.toUpperCase().replace(/\s+/g, ""),
       autoSupplierCode: !r.supplierCode,
       supplierName: r.supplierName,
@@ -190,6 +193,9 @@ export async function planBulkImport(client: Client, input: BulkInputRow[]) {
       sp: r.sp,
       errors,
     };
+
+    if (typedCode && !/^[A-Z0-9_-]{1,50}$/.test(typedCode))
+      errors.push("CODE may only use letters, numbers, - or _ (max 50)");
 
     if (r.itemName.length < 2 || r.itemName.length > 150)
       errors.push("Product name must be 2–150 characters");
@@ -278,6 +284,8 @@ export async function planBulkImport(client: Client, input: BulkInputRow[]) {
     if (!r.errors.length && taken.has(r.supplierCode))
       r.errors.push(`Supplier code ${r.supplierCode} already exists`);
 
+  const nextSerial = await planProductCodes(client, rows);
+
   // Per supplier: next number = max(highest code in database + 1, highest typed + 1), then fill blanks.
   const valid = rows.filter((r) => !r.errors.length);
   const supplierIds = [...new Set(valid.map((r) => r.supplierId!))];
@@ -311,17 +319,68 @@ export async function planBulkImport(client: Client, input: BulkInputRow[]) {
     }
     nextNumbers.set(supplierId, next);
   }
-  // Product codes the valid rows will get, in file order.
+  return { rows, nextNumbers, nextSerial };
+}
+
+/**
+ * A typed CODE is kept as-is (must be unique). Blank ones get the next Code
+ * Settings number, skipping codes already used. When a typed code has the
+ * settings prefix (TT13546), the counter moves past it so later manual entries
+ * continue from there. Returns the new Code Settings "next number".
+ */
+async function planProductCodes(client: Client, rows: PlannedRow[]) {
+  const typed = rows.filter((r) => !r.errors.length && !r.autoCode);
+  const seen = new Map<string, number>();
+  for (const r of typed) {
+    const first = seen.get(r.code);
+    if (first) r.errors.push(`CODE repeated (also on row ${first})`);
+    else seen.set(r.code, r.row);
+  }
+  const typedCodes = [...seen.keys()];
+  const taken = new Set(
+    typedCodes.length
+      ? (
+          await client.product.findMany({
+            where: { sn: { in: typedCodes } },
+            select: { sn: true },
+          })
+        ).map((p) => p.sn)
+      : [],
+  );
+  for (const r of typed)
+    if (!r.errors.length && taken.has(r.code))
+      r.errors.push(`CODE ${r.code} already exists`);
+
   const serial = await client.serialSetting.findUnique({
     where: { id: "product" },
   });
   const prefix = serial?.prefix ?? "MT";
   const digits = serial?.digits ?? 4;
-  let sn = serial?.nextNumber ?? 1;
-  for (const r of rows)
-    if (!r.errors.length) r.code = prefix + String(sn++).padStart(digits, "0");
+  let next = serial?.nextNumber ?? 1;
+  const pattern = new RegExp(`^${prefix.replace(/[^A-Za-z0-9]/g, "\\$&")}(\\d+)$`);
+  for (const r of typed) {
+    const n = Number(r.code.match(pattern)?.[1]);
+    if (!r.errors.length && Number.isSafeInteger(n)) next = Math.max(next, n + 1);
+  }
 
-  return { rows, nextNumbers };
+  const autos = rows.filter((r) => !r.errors.length && r.autoCode);
+  if (autos.length) {
+    const used = new Set(
+      (
+        await client.product.findMany({
+          where: { sn: { startsWith: prefix } },
+          select: { sn: true },
+        })
+      ).map((p) => p.sn),
+    );
+    typedCodes.forEach((c) => used.add(c));
+    const format = (n: number) => prefix + String(n).padStart(digits, "0");
+    for (const r of autos) {
+      while (used.has(format(next))) next++;
+      r.code = format(next++);
+    }
+  }
+  return next;
 }
 
 /** Insert the valid rows in one Serializable transaction (retried on conflicts). */
@@ -330,25 +389,20 @@ export async function commitBulkImport(db: PrismaClient, input: BulkInputRow[]) 
     try {
       return await db.$transaction(
         async (tx) => {
-          const { rows, nextNumbers } = await planBulkImport(tx, input);
+          const { rows, nextNumbers, nextSerial } = await planBulkImport(
+            tx,
+            input,
+          );
           const valid = rows.filter((r) => !r.errors.length);
           if (!valid.length) return { rows, created: [] as string[] };
 
+          // Typed CODEs were kept; the counter moves past them and the blanks.
           await tx.serialSetting.upsert({
             where: { id: "product" },
-            update: {},
-            create: { id: "product" },
+            update: { nextNumber: nextSerial },
+            create: { id: "product", nextNumber: nextSerial },
           });
-          const serial = await tx.serialSetting.update({
-            where: { id: "product" },
-            data: { nextNumber: { increment: valid.length } },
-          });
-          const start = serial.nextNumber - valid.length;
-          const sns = valid.map((r, i) => {
-            r.code =
-              serial.prefix + String(start + i).padStart(serial.digits, "0");
-            return r.code;
-          });
+          const sns = valid.map((r) => r.code);
 
           await tx.product.createMany({
             data: valid.map((r, i) => ({
@@ -462,11 +516,10 @@ export async function buildBulkTemplate(db: PrismaClient) {
       sp: 1999,
     },
   ]);
-  // CODE is informational: grey it out and explain on the header.
-  sheet.getColumn("code").font = { italic: true, color: { argb: "FF94A3B8" } };
+  // Explain CODE on its header: typed values are kept, blanks are generated.
   header.getCell(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
   header.getCell(1).note =
-    "Auto-generated when you import. Leave blank; anything typed here is ignored.";
+    "Type a code to keep it as-is, or leave blank to get the next code from Code Settings.";
 
   const lists = wb.addWorksheet("Lists");
   lists.columns = [
@@ -504,7 +557,8 @@ export async function buildBulkTemplate(db: PrismaClient) {
     "HOW TO BULK UPLOAD PRODUCTS",
     "",
     "1. Fill one product per row in the Products sheet. Keep the header row unchanged.",
-    `2. CODE (e.g. ${productCode(0)}) is generated automatically on import. Leave it blank; typed values are ignored.`,
+    `2. CODE: type it (e.g. TT13546) to keep it as-is, or leave it blank to get the next code from Code Settings (e.g. ${productCode(0)}).`,
+    "   A typed CODE must be unique. Manual entries continue after the highest typed code with the Code Settings prefix.",
     `3. SUPPLIER CODE: type it (e.g. ${prefix}${next}) or leave it blank to auto-generate.`,
     "   When you type a code, the next new product of that supplier continues from the next number.",
     "   The code must start with the supplier name letters (KKS → KKS1050).",

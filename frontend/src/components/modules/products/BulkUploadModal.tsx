@@ -18,6 +18,7 @@ import { EscapeKey } from "@/lib/useEscapeKey";
 type BulkRow = {
   row: number;
   code: string;
+  autoCode?: boolean;
   supplierCode: string;
   autoSupplierCode: boolean;
   supplierName: string;
@@ -160,7 +161,8 @@ export default function BulkUploadModal({
                 </p>
                 <p className="mt-1 text-sm text-slate-500">
                   Columns: Code, Supplier Code, Supplier Name, Product Name,
-                  Category, Template, PP, SP. Code is generated automatically.
+                  Category, Template, PP, SP. A typed Code is kept as-is; leave it
+                  blank to use Code Settings.
                   Leave Supplier Code blank to auto-generate it.
                 </p>
                 <button
@@ -274,6 +276,11 @@ export default function BulkUploadModal({
                           <td className="px-3 py-2 text-slate-500">{r.row}</td>
                           <td className="px-3 py-2 font-semibold text-violet-700">
                             {r.code || "-"}
+                            {r.autoCode && r.code && (
+                              <span className="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-500">
+                                auto
+                              </span>
+                            )}
                           </td>
                           <td className="px-3 py-2 font-semibold">
                             {r.supplierCode || "-"}

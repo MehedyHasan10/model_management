@@ -23,6 +23,7 @@ import {
   RefreshCw,
   Search,
   Trash2,
+  Upload,
   X,
   Package,
   SearchCheck,
@@ -51,6 +52,7 @@ import { EMPTY, localDateInput } from "@/lib/format";
 import { EscapeKey } from "@/lib/useEscapeKey";
 
 const ProductPreviewModal = lazy(() => import("./ProductPreviewModal"));
+const BulkUploadModal = lazy(() => import("./BulkUploadModal"));
 
 type Field = {
   fieldId: string;
@@ -310,6 +312,8 @@ export default function ProductsPage() {
   } | null>(null);
 
   const [deleting, setDeleting] = useState<Product | null>(null);
+
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -749,12 +753,20 @@ export default function ProductsPage() {
         </div>
 
         {has("create") && (
-          <button
-            onClick={() => void openCreate()}
-            className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-3 font-semibold text-white shadow-sm hover:bg-violet-700"
-          >
-            <Plus size={18} /> Create Product
-          </button>
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={() => setBulkOpen(true)}
+              className="inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-white px-5 py-3 font-semibold text-violet-700 shadow-sm hover:bg-violet-50"
+            >
+              <Upload size={18} /> Bulk Upload
+            </button>
+            <button
+              onClick={() => void openCreate()}
+              className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-3 font-semibold text-white shadow-sm hover:bg-violet-700"
+            >
+              <Plus size={18} /> Create Product
+            </button>
+          </div>
         )}
       </header>
 
@@ -1485,6 +1497,17 @@ export default function ProductsPage() {
               {imageViewer.index + 1} / {imageViewer.images.length}
             </span>
           </div>
+        </ModalPortal>
+      )}
+
+      {bulkOpen && (
+        <ModalPortal>
+          <Suspense fallback={null}>
+            <BulkUploadModal
+              onClose={() => setBulkOpen(false)}
+              onImported={reload}
+            />
+          </Suspense>
         </ModalPortal>
       )}
 

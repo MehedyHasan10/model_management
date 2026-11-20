@@ -516,13 +516,15 @@ export default function FieldsPage() {
           />
         )}
 
-        <Pagination
-          page={current}
-          setPage={setPage}
-          total={matching}
-          limit={limit}
-          setLimit={setLimit}
-        />
+        <div className="border-t border-slate-100 px-5 pb-4">
+          <Pagination
+            page={current}
+            setPage={setPage}
+            total={matching}
+            limit={limit}
+            setLimit={setLimit}
+          />
+        </div>
       </section>
       </>
       )}

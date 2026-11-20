@@ -91,7 +91,7 @@ export default function DashboardView({ data }: Props) {
       caption: "Registered models",
     },
     {
-      title: "Assignments",
+      title: "Assign",
       value: data.assignments,
       icon: ClipboardList,
       color: "text-amber-600",
@@ -181,7 +181,7 @@ export default function DashboardView({ data }: Props) {
       color: "bg-blue-50 text-blue-600",
     },
     {
-      title: "New Assignment",
+      title: "New Assign",
       description: "Issue products to models",
       href: "/assignments",
       icon: ClipboardPlus,
@@ -211,7 +211,7 @@ export default function DashboardView({ data }: Props) {
           </h1>
 
           <p className="mt-1 text-sm text-slate-500">
-            Garment measurement and model assignment overview
+            Measurement and model assign overview
           </p>
         </div>
 
@@ -509,7 +509,7 @@ export default function DashboardView({ data }: Props) {
         <div className="mb-4 flex items-center gap-2">
           <Ruler size={19} className="text-violet-600" />
           <h2 className="text-base font-bold text-slate-900">
-            Garment Workflow
+            Model Management Workflow
           </h2>
         </div>
 
@@ -519,7 +519,7 @@ export default function DashboardView({ data }: Props) {
             "Templates",
             "Products & Images",
             "Models",
-            "Assignments",
+            "Assign",
             "Returns",
             "Quantity Tracking",
           ].map((step, index, array) => (
@@ -542,7 +542,7 @@ export default function DashboardView({ data }: Props) {
         </div>
 
         <p className="mt-4 text-xs text-slate-500">
-          Create garment categories and measurement templates
+          Create categories and measurement templates
           before registering products and assigning them to models.
         </p>
       </section>

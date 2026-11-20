@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { createPortal } from "react-dom";
 
@@ -1086,11 +1081,11 @@ export default function ModelsPage() {
               }}
               className="rounded-lg border px-2 py-1"
             >
-              <option value={10}>10 rows</option>
+              <option value={10}>10</option>
 
-              <option value={20}>20 rows</option>
+              <option value={20}>20</option>
 
-              <option value={50}>50 rows</option>
+              <option value={50}>50</option>
             </select>
 
             <button

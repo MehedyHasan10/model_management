@@ -476,8 +476,15 @@ export default function RolesPage() {
           ),
         },
       ]}
+      // System roles (Super Admin) are protected by the API.
+      rowEditable={(row) => !row.system}
+      rowDeletable={(row) => !row.system}
       validate={(value) =>
-        !value.name?.trim() ? "Role name is required" : undefined
+        !value.name?.trim()
+          ? "Role name is required"
+          : value.name.trim().length < 2
+            ? "Role name must be at least 2 characters"
+            : undefined
       }
     />
   );

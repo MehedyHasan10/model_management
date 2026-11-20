@@ -152,12 +152,20 @@ function LazyPhoto({
   alt: string;
   className: string;
 }) {
-  const [loaded, setLoaded] = useState(false);
-  const [failed, setFailed] = useState(false);
-  useEffect(() => {
-    setLoaded(false);
-    setFailed(false);
-  }, [src]);
+  const [state, setState] = useState({ src, loaded: false, failed: false });
+  // Reset during render when src changes. A post-mount effect would wipe out
+  // an onLoad that already fired for a cached image and spin forever.
+  if (state.src !== src) setState({ src, loaded: false, failed: false });
+  const loaded = state.src === src && state.loaded;
+  const failed = state.src === src && state.failed;
+  const setLoaded = () => setState({ src, loaded: true, failed: false });
+  const setFailed = () => setState({ src, loaded: false, failed: true });
+  // Catch images that finished loading before React attached onLoad.
+  const checkComplete = (img: HTMLImageElement | null) => {
+    if (!img?.complete || loaded || failed) return;
+    if (img.naturalWidth > 0) setLoaded();
+    else setFailed();
+  };
   return (
     <span className="relative inline-flex shrink-0 overflow-hidden rounded-lg bg-slate-100">
       {!loaded && !failed && (
@@ -171,12 +179,13 @@ function LazyPhoto({
         </span>
       ) : (
         <img
+          ref={checkComplete}
           src={src}
           alt={alt}
           loading="lazy"
           decoding="async"
-          onLoad={() => setLoaded(true)}
-          onError={() => setFailed(true)}
+          onLoad={setLoaded}
+          onError={setFailed}
           className={className}
         />
       )}
@@ -917,11 +926,21 @@ export default function ModelsPage() {
                   >
                     <td className="px-4 py-3">
                       {m.photoUrl ? (
-                        <LazyPhoto
-                          src={m.photoUrl}
-                          alt={m.name}
-                          className="h-12 w-12 rounded-xl border object-cover"
-                        />
+                        <button
+                          type="button"
+                          title="Preview model photo"
+                          aria-label={`Preview ${m.name} photo`}
+                          onClick={() =>
+                            setPreviewImage({ url: m.photoUrl!, name: m.name })
+                          }
+                          className="rounded-xl transition hover:ring-2 hover:ring-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-400"
+                        >
+                          <LazyPhoto
+                            src={m.photoUrl}
+                            alt={m.name}
+                            className="h-12 w-12 rounded-xl border object-cover"
+                          />
+                        </button>
                       ) : (
                         <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
                           <UserRound size={21} />
@@ -1101,34 +1120,30 @@ export default function ModelsPage() {
         <Portal>
           <EscapeKey onEscape={() => setPreviewImage(null)} />
           <div
-            className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/80 p-4"
+            className="fixed inset-0 z-[200000] flex items-center justify-center bg-slate-950/90 p-4"
             role="dialog"
             aria-modal="true"
-            aria-label="Product image preview"
+            aria-label="Image preview"
             onClick={() => setPreviewImage(null)}
           >
-            <div
-              className="relative max-h-[92vh] max-w-5xl"
-              onClick={(e) => e.stopPropagation()}
+            <button
+              type="button"
+              aria-label="Close image preview"
+              onClick={() => setPreviewImage(null)}
+              className="absolute right-5 top-5 rounded-full bg-white/15 p-3 text-white hover:bg-white/25"
             >
-              <button
-                type="button"
-                aria-label="Close image preview"
-                onClick={() => setPreviewImage(null)}
-                className="absolute -right-2 -top-2 rounded-full bg-white p-2 text-slate-700 shadow-lg hover:bg-slate-100"
-              >
-                <X size={20} />
-              </button>
+              <X size={23} />
+            </button>
 
-              <img
-                src={previewImage.url}
-                alt={previewImage.name}
-                className="max-h-[85vh] max-w-full rounded-xl object-contain shadow-2xl"
-              />
+            <img
+              src={previewImage.url}
+              alt={previewImage.name}
+              onClick={(e) => e.stopPropagation()}
+              className="max-h-[82vh] max-w-[85vw] rounded-xl object-contain"
+            />
 
-              <p className="mt-2 text-center text-sm text-white">
-                {previewImage.name}
-              </p>
+            <div className="absolute bottom-5 text-center text-sm text-white">
+              {previewImage.name}
             </div>
           </div>
         </Portal>

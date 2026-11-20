@@ -5,8 +5,6 @@ import {
   RotateCcw,
   X,
   Eye,
-  ChevronLeft,
-  ChevronRight,
   Trash2,
 } from "lucide-react";
 import toast from "react-hot-toast";
@@ -18,6 +16,7 @@ import { ContentCell, ProductCodeButton } from "./AssignmentCells";
 import { localDateInput, plural } from "@/lib/format";
 import { measurementText } from "@/lib/measurement";
 import { useEscapeKey } from "@/lib/useEscapeKey";
+import ImagePreview, { productImages } from "@/components/shared/ImagePreview";
 const returnQty = (i: any) =>
   (i.returnItems || []).reduce(
     (n: number, x: any) => n + Number(x.quantity || 0),
@@ -38,10 +37,12 @@ const dateText = (value: any) =>
   value && !Number.isNaN(new Date(value).getTime())
     ? new Date(value).toLocaleDateString()
     : "-";
-const productImages = (p: any): string[] =>
-  (Array.isArray(p?.images) ? p.images : [])
-    .map((img: any) => (typeof img === "string" ? img : img?.url))
-    .filter(Boolean);
+
+// Shape a model like a product so it can reuse ImagePreview.
+const modelImage = (model: any) => ({
+  itemName: model?.name || "Model",
+  images: model?.photoUrl ? [model.photoUrl] : [],
+});
 const distinctProducts = (r: any) =>
   Array.from(
     new Map(
@@ -62,116 +63,6 @@ const returnDate = (r: any) => {
     .filter((x: number) => !Number.isNaN(x));
   return dates.length ? dateText(Math.max(...dates)) : "-";
 };
-function ImagePreview({
-  product,
-  className = "h-11 w-11",
-}: {
-  product: any;
-  className?: string;
-}) {
-  const images = productImages(product);
-  const [index, setIndex] = useState<number | null>(null);
-  useEscapeKey(() => setIndex(null), index !== null);
-  useEffect(() => {
-    if (index === null) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "ArrowRight")
-        setIndex((i) => (i === null ? null : (i + 1) % images.length));
-      if (event.key === "ArrowLeft")
-        setIndex((i) =>
-          i === null ? null : (i - 1 + images.length) % images.length,
-        );
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [index, images.length]);
-  if (!images.length)
-    return (
-      <span
-        className={`${className} inline-flex items-center justify-center rounded-xl bg-slate-100 text-xs text-slate-400`}
-      >
-        N/A
-      </span>
-    );
-  return (
-    <>
-      <button
-        type="button"
-        title="Preview product image"
-        aria-label={`Preview ${product?.itemName || "product"} image`}
-        onClick={(e) => {
-          e.stopPropagation();
-          setIndex(0);
-        }}
-        className="rounded-xl focus-visible:outline-2 focus-visible:outline-violet-600"
-      >
-        <img
-          src={images[0]}
-          alt={product?.itemName || "Product"}
-          className={`${className} rounded-xl border-2 border-white object-cover hover:ring-2 hover:ring-violet-400`}
-        />
-      </button>
-      {index !== null &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div
-            className="fixed inset-0 z-[200000] flex items-center justify-center bg-slate-950/90 p-4"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Product image preview"
-            onClick={() => setIndex(null)}
-          >
-            <button
-              type="button"
-              onClick={() => setIndex(null)}
-              aria-label="Close image preview"
-              className="absolute right-5 top-5 rounded-full bg-white/15 p-3 text-white hover:bg-white/25"
-            >
-              <X size={23} />
-            </button>
-            {images.length > 1 && (
-              <button
-                type="button"
-                aria-label="Previous image"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIndex((index - 1 + images.length) % images.length);
-                }}
-                className="absolute left-3 rounded-full bg-white/20 p-3 text-white"
-              >
-                <ChevronLeft />
-              </button>
-            )}
-            <img
-              src={images[index]}
-              alt={product?.itemName || "Product"}
-              onClick={(e) => e.stopPropagation()}
-              className="max-h-[82vh] max-w-[85vw] rounded-xl object-contain"
-            />
-            {images.length > 1 && (
-              <button
-                type="button"
-                aria-label="Next image"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIndex((index + 1) % images.length);
-                }}
-                className="absolute right-3 rounded-full bg-white/20 p-3 text-white"
-              >
-                <ChevronRight />
-              </button>
-            )}
-            <div className="absolute bottom-5 text-center text-sm text-white">
-              {product?.itemName || "Product"}
-              {images.length > 1 ? ` · ${index + 1} / ${images.length}` : ""}
-            </div>
-          </div>,
-          document.body,
-        )}
-    </>
-  );
-}
-
 function measurementFields(product: any): any[] {
   const configured = Array.isArray(product?.template?.fields)
     ? product.template.fields
@@ -250,10 +141,10 @@ export function AssignmentDetails({
           <div className="grid gap-4 rounded-xl border bg-white p-4 text-sm sm:grid-cols-4">
             <div className="flex items-center gap-2">
               {assignment.model?.photoUrl && (
-                <img
-                  src={assignment.model.photoUrl}
-                  alt=""
-                  className="h-10 w-10 rounded-full object-cover"
+                <ImagePreview
+                  product={modelImage(assignment.model)}
+                  className="h-10 w-10"
+                  rounded="rounded-full"
                 />
               )}
               <div>
@@ -461,6 +352,22 @@ export const assignmentColumns = [
     ),
   },
   {
+    label: "Product Name",
+    render: (r: any) => (
+      <div className="flex min-w-32 max-w-52 flex-col gap-1">
+        {distinctProducts(r).map((p: any, idx: number) => (
+          <span
+            key={p.id || idx}
+            title={p.itemName}
+            className="truncate text-sm font-medium text-slate-800"
+          >
+            {p.itemName || "-"}
+          </span>
+        ))}
+      </div>
+    ),
+  },
+  {
     label: "Supplier Code",
     render: (r: any) => (
       <div className="flex max-w-44 flex-wrap gap-1">
@@ -480,10 +387,10 @@ export const assignmentColumns = [
     render: (r: any) => (
       <div className="flex min-w-36 items-center gap-2">
         {r.model?.photoUrl ? (
-          <img
-            src={r.model.photoUrl}
-            alt=""
-            className="h-9 w-9 rounded-full object-cover"
+          <ImagePreview
+            product={modelImage(r.model)}
+            className="h-9 w-9"
+            rounded="rounded-full"
           />
         ) : (
           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-500">
@@ -1556,6 +1463,29 @@ export default function AssignmentsPage() {
         Form={Form}
         relatedKeys={["models", "products", "templates"]}
         columns={assignmentColumns}
+        prepareEdit={(r) => ({
+          id: r.id,
+          modelId: r.modelId || r.model?.id || "",
+          sentDate: r.sentDate ? localDateInput(new Date(r.sentDate)) : "",
+          expectedReturnDate: r.expectedReturnDate
+            ? localDateInput(new Date(r.expectedReturnDate))
+            : "",
+          notes: r.notes || "",
+          items: (r.items || []).map((i: any) => ({
+            productId: i.productId || i.product?.id,
+            size: i.size,
+            sentQty: Number(i.sentQty || 0),
+          })),
+        })}
+        // Mirrors the API: edits are locked once returns exist or the
+        // assign is completed/cancelled; deletes only once returns exist.
+        rowEditable={(r) =>
+          !(r.returns || []).length &&
+          !["COMPLETED", "CANCELLED"].includes(
+            String(r.status || "").toUpperCase(),
+          )
+        }
+        rowDeletable={(r) => !(r.returns || []).length}
         rowActions={(r, refresh) => {
           const pending =
             sentQty(r) > returnedQty(r) &&

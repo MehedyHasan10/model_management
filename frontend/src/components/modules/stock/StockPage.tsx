@@ -9,6 +9,7 @@ import { Search, RefreshCw, Package, RotateCcw } from "lucide-react";
 import { api } from "@/lib/client-api";
 
 import Pagination from "@/components/shared/Pagination";
+import ImagePreview from "@/components/shared/ImagePreview";
 
 import { plural } from "@/lib/format";
 type ProductImage = { url: string; order?: number };
@@ -26,7 +27,7 @@ type StockRow = {
 
   productName: string;
 
-  image: string | null;
+  images: string[];
 
   size: string;
 
@@ -205,7 +206,7 @@ export default function StockPage() {
 
           productName: product.itemName || "-",
 
-          image: images[0]?.url || null,
+          images: images.map((img) => img.url),
 
           size: item.size || "-",
 
@@ -448,12 +449,13 @@ export default function StockPage() {
                     className="border-b border-slate-100 transition-colors hover:bg-violet-50/40"
                   >
                     <td className="px-4 py-3">
-                      {row.image ? (
-                        <img
-                          src={row.image}
-                          alt={row.productName}
-                          loading="lazy"
-                          className="h-14 w-14 rounded-xl border border-slate-200 bg-slate-50 object-cover"
+                      {row.images.length ? (
+                        <ImagePreview
+                          product={{
+                            itemName: row.productName,
+                            images: row.images,
+                          }}
+                          className="h-14 w-14"
                         />
                       ) : (
                         <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-slate-200 bg-slate-100 text-slate-400">

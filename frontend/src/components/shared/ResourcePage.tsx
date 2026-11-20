@@ -80,6 +80,11 @@ type Props = {
 
   prepareEdit?: (row: any) => any;
 
+  /** Per-row gates for the built-in Edit / Delete buttons (default: allowed). */
+  rowEditable?: (row: any) => boolean;
+
+  rowDeletable?: (row: any) => boolean;
+
   /** Text of the header button that opens the create form. */
   createLabel?: string;
 };
@@ -109,9 +114,16 @@ export default function ResourcePage({
 
   prepareEdit,
 
+  rowEditable,
+
+  rowDeletable,
+
   createLabel = "Create New",
 }: Props) {
   const account = useAccount();
+
+  // Read-only pages (e.g. Audit Logs) have nothing to put in an Actions column.
+  const showActions = Boolean(rowActions || Form);
 
   const has = (action: string) =>
     account.permissions.includes("*") ||
@@ -389,8 +401,17 @@ export default function ResourcePage({
           throw new Error(
             "Expected return date cannot be earlier than sent date",
           );
+        // The API schema is strict: send only the editable fields.
         payload = {
-          ...editing,
+          id: editing.id,
+
+          modelId: editing.modelId,
+
+          sentDate: editing.sentDate,
+
+          expectedReturnDate: editing.expectedReturnDate || null,
+
+          notes: editing.notes || null,
 
           items: (editing.items || [])
 
@@ -825,9 +846,11 @@ export default function ResourcePage({
                   </th>
                 ))}
 
-                <th className="px-4 py-3 text-left font-semibold text-slate-600">
-                  Actions
-                </th>
+                {showActions && (
+                  <th className="px-4 py-3 text-left font-semibold text-slate-600">
+                    Actions
+                  </th>
+                )}
               </tr>
             </thead>
 
@@ -843,11 +866,14 @@ export default function ResourcePage({
                     </td>
                   ))}
 
+                  {showActions && (
                   <td className="border-b border-slate-100 px-4 py-3">
                     <div className="flex items-center gap-2">
                       {rowActions?.(row, reload)}
 
-                      {Form && entity !== "assignments" && has("edit") && (
+                      {Form &&
+                        has("edit") &&
+                        (rowEditable?.(row) ?? true) && (
                         <button
                           type="button"
                           title="Edit"
@@ -858,7 +884,9 @@ export default function ResourcePage({
                         </button>
                       )}
 
-                      {Form && entity !== "assignments" && has("delete") && (
+                      {Form &&
+                        has("delete") &&
+                        (rowDeletable?.(row) ?? true) && (
                         <button
                           type="button"
                           title="Delete"
@@ -870,13 +898,14 @@ export default function ResourcePage({
                       )}
                     </div>
                   </td>
+                  )}
                 </tr>
               ))}
 
               {loading && (
                 <tr>
                   <td
-                    colSpan={columns.length + 1}
+                    colSpan={columns.length + (showActions ? 1 : 0)}
                     className="px-4 py-10 text-center text-slate-500"
                   >
                     <Loader2 className="mx-auto animate-spin" />
@@ -889,7 +918,7 @@ export default function ResourcePage({
               {!loading && filtered.length === 0 && (
                 <tr>
                   <td
-                    colSpan={columns.length + 1}
+                    colSpan={columns.length + (showActions ? 1 : 0)}
                     className="px-4 py-10 text-center text-slate-500"
                   >
                     No records found
@@ -1048,6 +1077,8 @@ export default function ResourcePage({
               deleting.itemName ||
               deleting.number ||
               deleting.sn ||
+              (deleting.model?.name &&
+                `assignment for ${deleting.model.name}`) ||
               "Selected record"
             }
             busy={busy}

@@ -684,7 +684,11 @@ export async function GET(req: NextRequest, context: Context) {
 
           include: {
             user: {
-              select: { name: true },
+              select: {
+                name: true,
+                email: true,
+                roles: { select: { role: { select: { name: true } } } },
+              },
             },
           },
 
@@ -1020,6 +1024,13 @@ export async function POST(req: NextRequest, context: Context) {
             400,
           );
         }
+
+        if (
+          (await db.permission.count({
+            where: { id: { in: v.permissionIds } },
+          })) !== v.permissionIds.length
+        )
+          return fail("Invalid permission selection", 400);
 
         data = await db.role.create({
           data: {

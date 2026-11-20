@@ -17,8 +17,25 @@ export default function AuditPage() {
               : "-",
         },
         {
-          label: "User",
-          render: (row) => row.user?.name || "System",
+          label: "User Name",
+          render: (row) => (
+            <div>
+              <p className="font-medium text-slate-800">
+                {row.user?.name || "System"}
+              </p>
+              {row.user?.email && (
+                <p className="text-xs text-slate-500">{row.user.email}</p>
+              )}
+            </div>
+          ),
+        },
+        {
+          label: "Role",
+          render: (row) =>
+            (row.user?.roles || [])
+              .map((r: any) => r.role?.name)
+              .filter(Boolean)
+              .join(", ") || "-",
         },
         {
           label: "Action",

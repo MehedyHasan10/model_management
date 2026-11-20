@@ -332,6 +332,48 @@ function pagination(req: NextRequest) {
   };
 }
 
+/** Product list filters: q (text), ids (comma list), createdFrom/createdTo (ISO). */
+function productListWhere(params: URLSearchParams): Prisma.ProductWhereInput {
+  const and: Prisma.ProductWhereInput[] = [];
+  const q = params.get("q")?.trim().slice(0, 100);
+  if (q) {
+    const has = { contains: q, mode: "insensitive" as const };
+    and.push({
+      OR: [
+        { sn: has },
+        { supplierCode: has },
+        { itemName: has },
+        { fabric: has },
+        { pp: has },
+        { sp: has },
+        { wp: has },
+        { supplier: { name: has } },
+        { category: { name: has } },
+        { template: { name: has } },
+      ],
+    });
+  }
+  const ids = params.get("ids")?.split(",").filter(Boolean).slice(0, 200);
+  if (ids?.length) and.push({ id: { in: ids } });
+  const date = (key: string) => {
+    const value = params.get(key);
+    const parsed = value ? new Date(value) : null;
+    return parsed && !Number.isNaN(parsed.getTime()) ? parsed : undefined;
+  };
+  const gte = date("createdFrom");
+  const lte = date("createdTo");
+  if (gte || lte) and.push({ createdAt: { gte, lte } });
+  return and.length ? { AND: and } : {};
+}
+
+function productOrder(
+  sort: string | null,
+): Prisma.ProductOrderByWithRelationInput[] {
+  if (sort === "oldest") return [{ createdAt: "asc" }, { id: "asc" }];
+  if (sort === "name") return [{ itemName: "asc" }, { id: "asc" }];
+  return [{ createdAt: "desc" }, { id: "desc" }];
+}
+
 function paged(items: unknown[], total: number, page: number, limit: number) {
   return {
     items,
@@ -441,44 +483,62 @@ export async function GET(req: NextRequest, context: Context) {
 
             category: true,
 
-            template: {
-              include: {
-                fields: {
-                  include: { field: fieldWithUnit },
-
-                  orderBy: { order: "asc" as const },
-                },
-              },
-            },
+            // List stays light: template fields/sizes come from /api/templates,
+            // which every product screen already loads. A lookup by ids (a
+            // preview or the assign form) gets the full template.
+            template: req.nextUrl.searchParams.get("ids")
+              ? {
+                  include: {
+                    fields: {
+                      include: { field: fieldWithUnit },
+                      orderBy: { order: "asc" as const },
+                    },
+                  },
+                }
+              : { select: { id: true, name: true } },
 
             images: {
+              select: { id: true, url: true, order: true },
+
               orderBy: { order: "asc" as const },
             },
 
             measurements: {
-              include: { field: fieldWithUnit },
+              select: {
+                id: true,
+                size: true,
+                fieldId: true,
+                value: true,
+                field: { select: { id: true, name: true } },
+              },
             },
           },
 
-          orderBy: [{ createdAt: "desc" as const }, { id: "desc" as const }],
+          orderBy: productOrder(req.nextUrl.searchParams.get("sort")),
         };
 
+        const where = productListWhere(req.nextUrl.searchParams);
+
         if (!p.enabled) {
-          data = await db.product.findMany(query);
+          data = await db.product.findMany({ ...query, where });
         } else {
-          const [items, total] = await Promise.all([
+          const [items, total, totalAll] = await Promise.all([
             db.product.findMany({
               ...query,
+
+              where,
 
               skip: p.skip,
 
               take: p.limit,
             }),
 
+            db.product.count({ where }),
+
             db.product.count(),
           ]);
 
-          data = paged(items, total, p.page, p.limit);
+          data = { ...paged(items, total, p.page, p.limit), totalAll };
         }
 
         break;

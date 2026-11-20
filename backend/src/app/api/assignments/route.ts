@@ -9,6 +9,7 @@ import {
   assignmentFail,
   assignmentError,
   assignmentInclude,
+  assignmentListInclude,
   withQuantities,
   validateProductSizes,
 } from "@/lib/assignment-http";
@@ -36,10 +37,12 @@ export async function GET(req: NextRequest) {
     )
       return assignmentFail("Invalid pagination", 400);
     const where: Prisma.AssignmentWhereInput = modelId ? { modelId } : {};
+    const include =
+      search.get("view") === "list" ? assignmentListInclude : assignmentInclude;
     if (!paginated) {
       const rows = await db.assignment.findMany({
         where,
-        include: assignmentInclude,
+        include,
         orderBy: { createdAt: "desc" },
       });
       return assignmentJson(rows.map(withQuantities));
@@ -47,7 +50,7 @@ export async function GET(req: NextRequest) {
     const [rows, total] = await Promise.all([
       db.assignment.findMany({
         where,
-        include: assignmentInclude,
+        include,
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,

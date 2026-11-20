@@ -8,7 +8,8 @@
     "start": "next start -p 4000",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "db:convert-images": "tsx prisma/convert-data-images.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

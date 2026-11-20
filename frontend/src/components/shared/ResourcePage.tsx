@@ -168,7 +168,12 @@ export default function ResourcePage({
       const keys = relatedKeyString ? relatedKeyString.split(",") : [];
 
       const [rows, ...refs] = await Promise.all([
-        api<any[]>(endpoint || entity),
+        // Assign directories use light rows; dialogs load the full assignment.
+        api<any[]>(
+          (endpoint || entity) === "assignments"
+            ? "assignments?view=list"
+            : endpoint || entity,
+        ),
 
         ...keys.map((key) => api<any[]>(key)),
       ]);

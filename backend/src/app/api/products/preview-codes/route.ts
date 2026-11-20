@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { currentUser, can } from "@/lib/auth";
 import { fail } from "@/lib/common";
+import { nextSupplierNumber, supplierPrefix } from "@/lib/product-supplier-code";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,13 +26,9 @@ export async function GET(req: NextRequest) {
         select: { name: true, status: true },
       });
       if (!supplier || supplier.status !== "ACTIVE") return fail("Supplier unavailable", 400);
-      const prefix = supplier.name.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+      const prefix = supplierPrefix(supplier.name);
       if (!prefix) return fail("Supplier prefix invalid", 400);
-      const sequence = await db.supplierProductSequence.findUnique({
-        where: { supplierId },
-        select: { nextNumber: true },
-      });
-      supplierCode = `${prefix}${sequence?.nextNumber ?? 1001}`;
+      supplierCode = `${prefix}${await nextSupplierNumber(db, supplierId, prefix)}`;
     }
 
     return NextResponse.json({ productCode, supplierCode }, {

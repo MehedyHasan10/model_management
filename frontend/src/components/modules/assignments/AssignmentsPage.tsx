@@ -12,7 +12,12 @@ import { useAccount } from "@/components/Shell";
 import ResourcePage, { type FormProps } from "@/components/shared/ResourcePage";
 import { TextField, SelectField } from "@/components/shared/FormFields";
 import { api } from "@/lib/client-api";
-import { ContentCell, ProductCodeButton } from "./AssignmentCells";
+import {
+  ContentCell,
+  LoadingOverlay,
+  ProductCodeButton,
+  useFullAssignment,
+} from "./AssignmentCells";
 import { localDateInput, plural } from "@/lib/format";
 import { measurementText } from "@/lib/measurement";
 import { useEscapeKey } from "@/lib/useEscapeKey";
@@ -102,7 +107,7 @@ function measurementValue(
     : String(value);
 }
 
-export function AssignmentDetails({
+function AssignmentDetailsView({
   assignment,
   onClose,
 }: {
@@ -469,7 +474,18 @@ export const assignmentColumns = [
 ];
 function Form({ value, change, related }: FormProps) {
   const items: any[] = value.items || [];
-  const products: any[] = related.products || [];
+  const [productCache, setProductCache] = useState<Record<string, any>>({});
+  const [resultIds, setResultIds] = useState<string[]>([]);
+  const [searchingProducts, setSearchingProducts] = useState(false);
+  const cacheProducts = useCallback((rows: any[]) => {
+    if (!rows.length) return;
+    setProductCache((cache) => {
+      const next = { ...cache };
+      for (const row of rows) next[row.id] = { ...row, ...cache[row.id] };
+      return next;
+    });
+  }, []);
+  const products: any[] = Object.values(productCache);
   const [productSearch, setProductSearch] = useState("");
   const [productDropdown, setProductDropdown] = useState(false);
   useEscapeKey(() => setProductDropdown(false), productDropdown);
@@ -541,15 +557,60 @@ function Form({ value, change, related }: FormProps) {
   const selectedProductIds = [
     ...new Set(items.map((i) => i.productId).filter(Boolean)),
   ];
-  const filteredProducts = products
-    .filter(
-      (p: any) =>
-        !selectedProductIds.includes(p.id) &&
-        `${p.sn || ""} ${p.supplierCode || ""} ${p.code || ""} ${p.itemName || ""}`
-          .toLowerCase()
-          .includes(productSearch.trim().toLowerCase()),
+
+  // Products already chosen (e.g. when editing) are fetched by id.
+  const missingIds = selectedProductIds
+    .filter((id) => !productCache[id])
+    .join(",");
+  useEffect(() => {
+    if (!missingIds) return;
+    let cancelled = false;
+    api<{ items?: any[] }>(
+      `products?ids=${encodeURIComponent(missingIds)}&page=1&limit=100`,
     )
-    .slice(0, 50);
+      .then((result) => {
+        if (!cancelled) cacheProducts(result.items || []);
+      })
+      .catch((error) => {
+        if (!cancelled) toast.error(error?.message || "Failed to load products");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [missingIds, cacheProducts]);
+
+  // The dropdown searches the server instead of holding every product.
+  useEffect(() => {
+    if (!productDropdown) return;
+    let cancelled = false;
+    const q = productSearch.trim();
+    const timer = setTimeout(() => {
+      setSearchingProducts(true);
+      api<{ items?: any[] }>(
+        `products?page=1&limit=50${q ? `&q=${encodeURIComponent(q)}` : ""}`,
+      )
+        .then((result) => {
+          if (cancelled) return;
+          cacheProducts(result.items || []);
+          setResultIds((result.items || []).map((p: any) => p.id));
+        })
+        .catch((error) => {
+          if (!cancelled)
+            toast.error(error?.message || "Failed to search products");
+        })
+        .finally(() => {
+          if (!cancelled) setSearchingProducts(false);
+        });
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [productSearch, productDropdown, cacheProducts]);
+
+  const filteredProducts = resultIds
+    .map((id) => productCache[id])
+    .filter((p: any) => p && !selectedProductIds.includes(p.id));
 
   const addProduct = (productId: string) => {
     if (!productId || selectedProductIds.includes(productId)) return;
@@ -788,7 +849,9 @@ function Form({ value, change, related }: FormProps) {
                     ))
                   ) : (
                     <p className="px-3 py-4 text-sm text-slate-500">
-                      No matching products found.
+                      {searchingProducts
+                        ? "Searching products..."
+                        : "No matching products found."}
                     </p>
                   )}
                   <button
@@ -1024,7 +1087,7 @@ function Form({ value, change, related }: FormProps) {
     </>
   );
 }
-export function ReceiveReturn({
+function ReceiveReturnView({
   assignment,
   onClose,
   onSaved,
@@ -1461,7 +1524,7 @@ export default function AssignmentsPage() {
           items: [],
         }}
         Form={Form}
-        relatedKeys={["models", "products", "templates"]}
+        relatedKeys={["models", "templates"]}
         columns={assignmentColumns}
         prepareEdit={(r) => ({
           id: r.id,
@@ -1563,5 +1626,39 @@ export default function AssignmentsPage() {
           document.body,
         )}
     </>
+  );
+}
+
+/** Loads the full assignment (images, measurements) before showing details. */
+export function AssignmentDetails({
+  assignment,
+  onClose,
+}: {
+  assignment: any;
+  onClose: () => void;
+}) {
+  const full = useFullAssignment(assignment, onClose);
+  return full ? (
+    <AssignmentDetailsView assignment={full} onClose={onClose} />
+  ) : (
+    <LoadingOverlay />
+  );
+}
+
+/** Loads the full assignment before opening the receive-return dialog. */
+export function ReceiveReturn({
+  assignment,
+  onClose,
+  onSaved,
+}: {
+  assignment: any;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const full = useFullAssignment(assignment, onClose);
+  return full ? (
+    <ReceiveReturnView assignment={full} onClose={onClose} onSaved={onSaved} />
+  ) : (
+    <LoadingOverlay />
   );
 }

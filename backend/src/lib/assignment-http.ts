@@ -62,8 +62,48 @@ export const assignmentInclude = {
               },
             },
           },
-          images: true,
-          measurements: { include: { field: fieldWithUnit } },
+          images: {
+            select: { id: true, url: true, order: true },
+            orderBy: { order: "asc" as const },
+          },
+          measurements: {
+            select: {
+              id: true,
+              size: true,
+              fieldId: true,
+              value: true,
+              field: { select: { id: true, name: true } },
+            },
+          },
+        },
+      },
+      returnItems: true,
+    },
+  },
+  returns: {
+    include: {
+      receivedBy: { select: { id: true, name: true } },
+      items: true,
+    },
+    orderBy: { receivedAt: "desc" as const },
+  },
+};
+/** Directory rows: only what the table, filters and edit form read. The
+ *  details/return dialogs load the full row from /api/assignments/[id]. */
+export const assignmentListInclude = {
+  model: true,
+  createdBy: { select: { id: true, name: true } },
+  contentDoneBy: { select: { id: true, name: true } },
+  items: {
+    include: {
+      product: {
+        select: {
+          id: true,
+          sn: true,
+          code: true,
+          supplierCode: true,
+          itemName: true,
+          templateId: true,
         },
       },
       returnItems: true,

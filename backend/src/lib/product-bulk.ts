@@ -1,6 +1,6 @@
 import ExcelJS from "exceljs";
 import { Prisma, PrismaClient } from "@prisma/client";
-import { supplierPrefix } from "@/lib/product-supplier-code";
+import { nextSupplierNumber, supplierPrefix } from "@/lib/product-supplier-code";
 
 export const BULK_MAX_ROWS = 1000;
 export const BULK_MAX_BYTES = 5 * 1024 * 1024;
@@ -278,21 +278,16 @@ export async function planBulkImport(client: Client, input: BulkInputRow[]) {
     if (!r.errors.length && taken.has(r.supplierCode))
       r.errors.push(`Supplier code ${r.supplierCode} already exists`);
 
-  // Per supplier: next number = max(current sequence, highest typed + 1), then fill blanks.
+  // Per supplier: next number = max(highest code in database + 1, highest typed + 1), then fill blanks.
   const valid = rows.filter((r) => !r.errors.length);
   const supplierIds = [...new Set(valid.map((r) => r.supplierId!))];
-  const sequences = await client.supplierProductSequence.findMany({
-    where: { supplierId: { in: supplierIds } },
-  });
   const nextNumbers = new Map<string, number>();
   for (const supplierId of supplierIds) {
     const own = valid.filter((r) => r.supplierId === supplierId);
     const prefix = supplierPrefix(
       suppliers.find((s) => s.id === supplierId)!.name,
     );
-    let next =
-      sequences.find((s) => s.supplierId === supplierId)?.nextNumber ??
-      DEFAULT_SUPPLIER_START;
+    let next = await nextSupplierNumber(client, supplierId, prefix);
     for (const r of own)
       if (!r.autoSupplierCode)
         next = Math.max(next, Number(r.supplierCode.slice(prefix.length)) + 1);
@@ -437,7 +432,9 @@ export async function buildBulkTemplate(db: PrismaClient) {
 
   const supplier = suppliers[0];
   const prefix = supplier ? supplierPrefix(supplier.name) : "KKS";
-  const next = supplier?.productSequence?.nextNumber ?? DEFAULT_SUPPLIER_START;
+  const next = supplier
+    ? await nextSupplierNumber(db, supplier.id, prefix)
+    : DEFAULT_SUPPLIER_START;
   const category =
     categories.find((c) => templates.some((t) => t.categoryId === c.id)) ??
     categories[0];

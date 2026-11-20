@@ -107,7 +107,6 @@ export function ContentCell({ row }: { row: any }) {
 
   useEffect(() => {
     setState(fromRow());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [row.id, row.contentDone, row.contentDoneAt]);
 
   const context = `${productCodes(row)} · ${row.model?.name || EMPTY}`;
@@ -196,9 +195,72 @@ export function ContentCell({ row }: { row: any }) {
   );
 }
 
+const loadingOverlay = (
+  <div className="fixed inset-0 z-[10050] flex items-center justify-center bg-slate-950/50">
+    <Loader2 className="animate-spin text-white" size={32} />
+  </div>
+);
+
+/** Spinner shown while a dialog fetches its full record. */
+export function LoadingOverlay() {
+  return loadingOverlay;
+}
+
+/**
+ * Directory rows are light (no images/measurements). Dialogs call this to
+ * load the full assignment; it returns null until loaded and closes on error.
+ */
+export function useFullAssignment(assignment: any, onClose: () => void) {
+  const [full, setFull] = useState<any | null>(
+    assignment?.items?.some((i: any) => i.product?.measurements)
+      ? assignment
+      : null,
+  );
+  const id = assignment?.id;
+  useEffect(() => {
+    if (!id || full?.id === id) return;
+    let cancelled = false;
+    api<any>(`assignments/${id}`)
+      .then((row) => {
+        if (!cancelled) setFull(row);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        toast.error(error?.message || "Failed to load assignment");
+        onClose();
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+  return full?.id === id ? full : null;
+}
+
 /** PRODUCT CODE pill that opens the shared Product Preview modal. */
 export function ProductCodeButton({ product }: { product: any }) {
   const [open, setOpen] = useState(false);
+  const [full, setFull] = useState<any | null>(
+    product?.measurements ? product : null,
+  );
+  // List rows carry only codes; fetch images/measurements on first open.
+  useEffect(() => {
+    if (!open || full || !product?.id) return;
+    let cancelled = false;
+    api<{ items?: any[] }>(
+      `products?ids=${encodeURIComponent(product.id)}&page=1&limit=1`,
+    )
+      .then((result) => {
+        if (!cancelled) setFull(result.items?.[0] ?? product);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        toast.error(error?.message || "Failed to load product");
+        setOpen(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, full, product]);
   return (
     <>
       <button
@@ -211,21 +273,19 @@ export function ProductCodeButton({ product }: { product: any }) {
       </button>
       {open &&
         createPortal(
-          <Suspense
-            fallback={
-              <div className="fixed inset-0 z-[10050] flex items-center justify-center bg-slate-950/50">
-                <Loader2 className="animate-spin text-white" size={32} />
+          !full ? (
+            loadingOverlay
+          ) : (
+            <Suspense fallback={loadingOverlay}>
+              {/* Above the assignment details dialog (z-10000) when opened from there. */}
+              <div className="relative z-[10040]">
+                <ProductPreviewModal
+                  product={full}
+                  onClose={() => setOpen(false)}
+                />
               </div>
-            }
-          >
-            {/* Above the assignment details dialog (z-10000) when opened from there. */}
-            <div className="relative z-[10040]">
-              <ProductPreviewModal
-                product={product}
-                onClose={() => setOpen(false)}
-              />
-            </div>
-          </Suspense>,
+            </Suspense>
+          ),
           document.body,
         )}
     </>

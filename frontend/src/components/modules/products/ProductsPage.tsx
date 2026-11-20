@@ -3,7 +3,6 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
   lazy,
   Suspense,
   useState,
@@ -48,7 +47,7 @@ import {
   normalizeMeasurementValue,
 } from "@/lib/measurement";
 
-import { EMPTY, localDateInput } from "@/lib/format";
+import { EMPTY } from "@/lib/format";
 import { EscapeKey } from "@/lib/useEscapeKey";
 
 const ProductPreviewModal = lazy(() => import("./ProductPreviewModal"));
@@ -189,7 +188,6 @@ const getImages = (p: Product) =>
 const dateLabel = (s?: string) => (s ? new Date(s).toLocaleDateString() : "-");
 
 // Local calendar date, so the From/To filter matches the date shown in the list.
-const asDate = (s?: string) => (s ? localDateInput(new Date(s)) : "");
 
 function ModalPortal({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false);
@@ -219,7 +217,7 @@ function unwrapItems<T>(result: ListResponse<T>): T[] {
       : [];
 }
 async function loadAll<T>(endpoint: string): Promise<T[]> {
-  const first = await api<ListResponse<T>>(`${endpoint}?page=1&limit=50`);
+  const first = await api<ListResponse<T>>(`${endpoint}?page=1&limit=100`);
   const items = unwrapItems(first);
   if (Array.isArray(first)) return items;
   const pages = Math.min(
@@ -229,13 +227,19 @@ async function loadAll<T>(endpoint: string): Promise<T[]> {
       Number(first.pagination?.totalPages) ||
         Math.ceil(
           (Number(first.pagination?.total) || items.length) /
-            (Number(first.pagination?.limit) || 50),
+            (Number(first.pagination?.limit) || 100),
         ),
     ),
   );
-  for (let p = 2; p <= pages; p++) {
-    const next = await api<ListResponse<T>>(`${endpoint}?page=${p}&limit=50`);
-    items.push(...unwrapItems(next));
+  // Fetch the remaining pages a few at a time instead of one after another.
+  const rest = Array.from({ length: pages - 1 }, (_, i) => i + 2);
+  for (let i = 0; i < rest.length; i += 6) {
+    const batch = await Promise.all(
+      rest
+        .slice(i, i + 6)
+        .map((p) => api<ListResponse<T>>(`${endpoint}?page=${p}&limit=100`)),
+    );
+    for (const next of batch) items.push(...unwrapItems(next));
   }
   return Array.from(
     new Map(items.map((item) => [(item as { id: string }).id, item])).values(),
@@ -315,18 +319,59 @@ export default function ProductsPage() {
 
   const [bulkOpen, setBulkOpen] = useState(false);
 
-  const reload = useCallback(async () => {
+  const [total, setTotal] = useState(0);
+  const [totalAll, setTotalAll] = useState(0);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [productsVersion, setProductsVersion] = useState(0);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Only the visible page is fetched; search, dates and sort run on the server.
+  useEffect(() => {
+    let cancelled = false;
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(limit),
+      sort,
+    });
+    if (debouncedSearch) params.set("q", debouncedSearch);
+    if (from) params.set("createdFrom", new Date(`${from}T00:00:00`).toISOString());
+    if (to) params.set("createdTo", new Date(`${to}T23:59:59.999`).toISOString());
     setLoading(true);
+    api<{
+      items: Product[];
+      pagination: { total: number };
+      totalAll?: number;
+    }>(`products?${params.toString()}`)
+      .then((result) => {
+        if (cancelled) return;
+        setProducts(result.items ?? []);
+        setTotal(result.pagination?.total ?? 0);
+        setTotalAll(result.totalAll ?? result.pagination?.total ?? 0);
+      })
+      .catch((error) => {
+        if (!cancelled) toast.error(`Products: ${readableError(error)}`);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [page, limit, sort, debouncedSearch, from, to, productsVersion]);
+
+  const reload = useCallback(async () => {
     setOptionsError("");
+    setProductsVersion((v) => v + 1);
     const results = await Promise.allSettled([
-      loadAll<Product>("products"),
       loadAll<Category>("categories"),
       loadAll<Template>("templates"),
       loadAll<SupplierOption>("suppliers"),
     ]);
-    const [p, c, t, s] = results;
-    if (p.status === "fulfilled") setProducts(p.value);
-    else toast.error(`Products: ${readableError(p.reason)}`);
+    const [c, t, s] = results;
     if (c.status === "fulfilled") setCategories(c.value);
     else setOptionsError(`Categories: ${readableError(c.reason)}`);
     if (t.status === "fulfilled") setTemplates(t.value);
@@ -339,76 +384,23 @@ export default function ProductsPage() {
     if (s.status === "fulfilled")
       setSuppliers(s.value.filter((supplier) => supplier.status === "ACTIVE"));
     else toast.error(`Suppliers: ${readableError(s.reason)}`);
-    setLoading(false);
   }, []);
 
   useEffect(() => {
     void reload();
   }, [reload]);
 
-  const filtered = useMemo(
-    () =>
-      products
-
-        .filter((p) => {
-          const q = search.trim().toLowerCase();
-
-          const text = [
-            p.sn,
-
-            p.supplierCode,
-            p.supplier?.name,
-
-            p.itemName,
-
-            p.category?.name,
-
-            p.template?.name,
-
-            p.fabric,
-
-            p.pp,
-
-            p.sp,
-
-            p.wp,
-          ]
-
-            .join(" ")
-
-            .toLowerCase();
-
-          const date = asDate(p.createdAt);
-
-          return (
-            (!q || text.includes(q)) &&
-            (!from || date >= from) &&
-            (!to || date <= to)
-          );
-        })
-
-        .sort((a, b) =>
-          sort === "oldest"
-            ? new Date(a.createdAt || 0).getTime() -
-              new Date(b.createdAt || 0).getTime()
-            : sort === "name"
-              ? a.itemName.localeCompare(b.itemName)
-              : new Date(b.createdAt || 0).getTime() -
-                new Date(a.createdAt || 0).getTime(),
-        ),
-
-    [products, search, from, to, sort],
-  );
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / limit));
+  const totalPages = Math.max(1, Math.ceil(total / limit));
 
   const currentPage = Math.min(page, totalPages);
 
-  const visible = filtered.slice(
-    (currentPage - 1) * limit,
+  // Step back when the last row of the final page is deleted.
+  useEffect(() => {
+    if (!loading && page > totalPages) setPage(totalPages);
+  }, [loading, page, totalPages]);
 
-    currentPage * limit,
-  );
+  // The server already returns just this page.
+  const visible = products;
 
   const update = (key: keyof Draft, value: any) =>
     setDraft((d) => {
@@ -776,7 +768,7 @@ export default function ProductsPage() {
           <div>
             <p className="text-sm font-medium text-slate-500">Total Products</p>
             <p className="mt-2 text-3xl font-bold text-slate-900">
-              {products.length}
+              {totalAll}
             </p>
           </div>
 
@@ -792,7 +784,7 @@ export default function ProductsPage() {
               Matching Search
             </p>
             <p className="mt-2 text-3xl font-bold text-violet-700">
-              {filtered.length}
+              {total}
             </p>
           </div>
 
@@ -1044,9 +1036,9 @@ export default function ProductsPage() {
 
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t p-4 text-sm text-slate-500">
           <span>
-            Showing {filtered.length ? (currentPage - 1) * limit + 1 : 0}-
-            {Math.min(currentPage * limit, filtered.length)} of{" "}
-            {filtered.length}
+            Showing {total ? (currentPage - 1) * limit + 1 : 0}-
+            {Math.min(currentPage * limit, total)} of{" "}
+            {total}
           </span>
 
           <div className="flex items-center gap-3">
@@ -1432,7 +1424,12 @@ export default function ProductsPage() {
             }
           >
             <ProductPreviewModal
-              product={preview}
+              product={{
+                ...preview,
+                template:
+                  templates.find((t) => t.id === preview.templateId) ??
+                  preview.template,
+              }}
               onClose={() => setPreview(null)}
             />
           </Suspense>

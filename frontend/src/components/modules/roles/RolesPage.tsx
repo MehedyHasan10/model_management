@@ -76,7 +76,11 @@ type Permission = {
   action?: string;
 };
 
+// Modules whose screen name differs from their permission key.
+const MODULE_LABELS: Record<string, string> = { assignments: "Assign" };
+
 const formatLabel = (value: string) =>
+  MODULE_LABELS[value] ??
   value
 
     .replace(/([a-z])([A-Z])/g, "$1 $2")

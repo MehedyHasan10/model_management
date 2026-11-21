@@ -428,12 +428,12 @@ export default function StockPage() {
 
                   "On Hand",
 
-                  "Don\'t Wear",
+                  "WSR",
                   "Due Date",
                 ].map((label) => (
                   <th
                     key={label}
-                    className={`px-4 py-4 font-semibold ${["Sent", "Returned", "On Hand", "Don't Wear"].includes(label) ? "text-center" : "text-left"}`}
+                    className={`px-4 py-4 font-semibold ${["Sent", "Returned", "On Hand", "WSR"].includes(label) ? "text-center" : "text-left"}`}
                   >
                     {label}
                   </th>

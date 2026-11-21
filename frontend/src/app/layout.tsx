@@ -5,7 +5,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Model Management",
-  description: "Measurement, assignments, returns and RBAC",
+  description: "Measurement, assign, returns and RBAC",
   icons: {
     icon: "/icon.png",
     shortcut: "/icon.png",

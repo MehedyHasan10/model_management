@@ -21,14 +21,29 @@ export default async function Dashboard() {
 
     const result = await response.json();
 
-    const data = {
-      products: Number(result?.products ?? 0),
-      models: Number(result?.models ?? 0),
-      assignments: Number(result?.assignments ?? 0),
-      sent: Number(result?.sent ?? 0),
-      returned: Number(result?.returned ?? 0),
-      onHand: Number(result?.onHand ?? 0),
-    };
+    const keys = [
+      "products",
+      "models",
+      "assignments",
+      "sent",
+      "returned",
+      "onHand",
+      "suppliers",
+      "activeSuppliers",
+      "categories",
+      "activeTemplates",
+      "activeModels",
+      "productsThisMonth",
+      "contentDone",
+      "contentPending",
+      "openAssignments",
+      "overdueAssignments",
+      "dontWear",
+      "damagedLost",
+    ] as const;
+    const data = Object.fromEntries(
+      keys.map((key) => [key, Number(result?.[key] ?? 0)]),
+    ) as Record<(typeof keys)[number], number>;
 
     return <DashboardView data={data} />;
   } catch (error) {

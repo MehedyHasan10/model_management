@@ -21,6 +21,17 @@ import {
   Layers3,
   Ruler,
   RotateCcw,
+  Truck,
+  Tags,
+  LayoutTemplate,
+  UserCheck,
+  CalendarPlus,
+  CircleCheckBig,
+  Clock,
+  AlarmClock,
+  Ban,
+  TriangleAlert,
+  Sparkles,
 } from "lucide-react";
 
 import {
@@ -43,6 +54,18 @@ type DashboardData = {
   sent: number;
   returned: number;
   onHand: number;
+  suppliers: number;
+  activeSuppliers: number;
+  categories: number;
+  activeTemplates: number;
+  activeModels: number;
+  productsThisMonth: number;
+  contentDone: number;
+  contentPending: number;
+  openAssignments: number;
+  overdueAssignments: number;
+  dontWear: number;
+  damagedLost: number;
 };
 
 type Props = {
@@ -98,7 +121,7 @@ export default function DashboardView({ data }: Props) {
       bg: "bg-amber-50",
       border: "border-amber-100",
       href: "/assignments",
-      caption: "Total assignments",
+      caption: "Total assign",
     },
     {
       title: "Sent Pieces",
@@ -129,6 +152,101 @@ export default function DashboardView({ data }: Props) {
       border: "border-orange-100",
       href: "/stock",
       caption: "Outstanding pieces",
+    },
+  ];
+
+  const insightCards = [
+    {
+      title: "Suppliers",
+      value: data.suppliers,
+      icon: Truck,
+      color: "text-violet-600",
+      bg: "bg-violet-50",
+      href: "/suppliers",
+      caption: `${data.activeSuppliers.toLocaleString()} active`,
+    },
+    {
+      title: "Categories",
+      value: data.categories,
+      icon: Tags,
+      color: "text-sky-600",
+      bg: "bg-sky-50",
+      href: "/categories",
+      caption: "Garment categories",
+    },
+    {
+      title: "Active Templates",
+      value: data.activeTemplates,
+      icon: LayoutTemplate,
+      color: "text-indigo-600",
+      bg: "bg-indigo-50",
+      href: "/templates",
+      caption: "Measurement templates in use",
+    },
+    {
+      title: "New Products",
+      value: data.productsThisMonth,
+      icon: CalendarPlus,
+      color: "text-fuchsia-600",
+      bg: "bg-fuchsia-50",
+      href: "/products",
+      caption: "Added this month",
+    },
+    {
+      title: "Active Models",
+      value: data.activeModels,
+      icon: UserCheck,
+      color: "text-blue-600",
+      bg: "bg-blue-50",
+      href: "/models",
+      caption: `of ${data.models.toLocaleString()} models`,
+    },
+    {
+      title: "Open Assigns",
+      value: data.openAssignments,
+      icon: Clock,
+      color: "text-amber-600",
+      bg: "bg-amber-50",
+      href: "/assignments",
+      caption: "Issued or partly returned",
+    },
+    {
+      title: "Overdue Returns",
+      value: data.overdueAssignments,
+      icon: AlarmClock,
+      color: "text-red-600",
+      bg: "bg-red-50",
+      href: "/returns",
+      caption: "Past expected return date",
+      alert: data.overdueAssignments > 0,
+    },
+    {
+      title: "Content Done",
+      value: data.contentDone,
+      icon: CircleCheckBig,
+      color: "text-emerald-600",
+      bg: "bg-emerald-50",
+      href: "/assignments",
+      caption: `${data.contentPending.toLocaleString()} still pending`,
+    },
+    {
+      title: "WSR",
+      value: data.dontWear,
+      icon: Ban,
+      color: "text-slate-600",
+      bg: "bg-slate-100",
+      href: "/returns",
+      caption: "WSR pieces from returns",
+    },
+    {
+      title: "Damaged / Lost",
+      value: data.damagedLost,
+      icon: TriangleAlert,
+      color: "text-orange-600",
+      bg: "bg-orange-50",
+      href: "/returns",
+      caption: "Returned in bad condition",
+      alert: data.damagedLost > 0,
     },
   ];
 
@@ -268,6 +386,55 @@ export default function DashboardView({ data }: Props) {
           );
         })}
       </div>
+
+      {/* More Insights */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="flex items-center gap-2 text-base font-bold text-slate-900">
+              <Sparkles size={19} className="text-violet-600" />
+              More Insights
+            </h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Suppliers, setup, assign and return quality
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          {insightCards.map((card) => {
+            const Icon = card.icon;
+
+            return (
+              <Link
+                key={card.title}
+                href={card.href}
+                className={`group flex items-center gap-3 rounded-xl border p-4 transition hover:border-violet-200 hover:bg-violet-50/30 ${
+                  card.alert ? "border-red-200 bg-red-50/40" : "border-slate-200"
+                }`}
+              >
+                <div
+                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${card.bg} ${card.color}`}
+                >
+                  <Icon size={21} />
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-medium text-slate-500">
+                    {card.title}
+                  </p>
+                  <p className="text-2xl font-extrabold tabular-nums text-slate-900">
+                    {card.value.toLocaleString()}
+                  </p>
+                  <p className="truncate text-[11px] text-slate-400">
+                    {card.caption}
+                  </p>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
 
       {/* Analytics Charts */}
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-5">

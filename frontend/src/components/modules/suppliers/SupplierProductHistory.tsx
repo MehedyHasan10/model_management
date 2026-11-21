@@ -170,7 +170,7 @@ export default function SupplierProductHistory({
     <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 text-slate-800">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="font-bold">
-          {supplierName} - Product &amp; Assignment History
+          {supplierName} - Product &amp; Assign History
         </h3>
         <button
           type="button"
@@ -191,7 +191,7 @@ export default function SupplierProductHistory({
             ["Sent", totals.sent],
             ["Returned", totals.returned],
             ["On Hand", totals.sent - totals.returned],
-            ["Don't Wear", totals.dontWear],
+            ["WSR", totals.dontWear],
           ] as const
         ).map(([label, value]) => (
           <div
@@ -277,7 +277,7 @@ export default function SupplierProductHistory({
                 "Sent",
                 "Returned",
                 "On Hand",
-                "Don't Wear",
+                "WSR",
               ].map((h) => (
                 <th key={h} className="px-3 py-3">
                   {h}

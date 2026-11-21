@@ -226,7 +226,7 @@ export function useFullAssignment(assignment: any, onClose: () => void) {
       })
       .catch((error) => {
         if (cancelled) return;
-        toast.error(error?.message || "Failed to load assignment");
+        toast.error(error?.message || "Failed to load assign");
         onClose();
       });
     return () => {

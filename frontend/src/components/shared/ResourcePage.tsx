@@ -153,6 +153,9 @@ export default function ResourcePage({
 
   const [modelFilter, setModelFilter] = useState("ALL");
 
+  // Assign page only: CONTENT column done (YES) or not (NO).
+  const [contentFilter, setContentFilter] = useState("ALL");
+
   const [fromDate, setFromDate] = useState("");
 
   const [toDate, setToDate] = useState("");
@@ -222,6 +225,13 @@ export default function ResourcePage({
       )
         return false;
 
+      if (
+        entity === "assignments" &&
+        contentFilter !== "ALL" &&
+        Boolean(item.contentDone) !== (contentFilter === "YES")
+      )
+        return false;
+
       if (isAssignmentDirectory) {
         const date = item.sentDate ? String(item.sentDate).slice(0, 10) : "";
 
@@ -242,6 +252,10 @@ export default function ResourcePage({
     statusFilter,
 
     modelFilter,
+
+    entity,
+
+    contentFilter,
 
     fromDate,
 
@@ -562,7 +576,7 @@ export default function ResourcePage({
             },
 
             {
-              label: "Don't Wear",
+              label: "WSR",
 
               count: data.reduce(
                 (n, r) =>
@@ -764,6 +778,23 @@ export default function ResourcePage({
                     ))}
                   </select>
 
+                  {entity === "assignments" && (
+                    <select
+                      value={contentFilter}
+                      onChange={(e) => {
+                        setContentFilter(e.target.value);
+
+                        setPage(1);
+                      }}
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm"
+                      aria-label="Filter by content"
+                    >
+                      <option value="ALL">All Content</option>
+                      <option value="YES">Content: Yes</option>
+                      <option value="NO">Content: No</option>
+                    </select>
+                  )}
+
                   <label className="flex shrink-0 items-center gap-1 text-xs text-slate-500">
                     From
                     <input
@@ -815,6 +846,8 @@ export default function ResourcePage({
                       setStatusFilter("ALL");
 
                       setModelFilter("ALL");
+
+                      setContentFilter("ALL");
 
                       setFromDate("");
 
@@ -1083,7 +1116,7 @@ export default function ResourcePage({
               deleting.number ||
               deleting.sn ||
               (deleting.model?.name &&
-                `assignment for ${deleting.model.name}`) ||
+                `assign for ${deleting.model.name}`) ||
               "Selected record"
             }
             busy={busy}

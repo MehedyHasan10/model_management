@@ -223,7 +223,8 @@ const userSchema = z
 
     password: z.string().min(8).max(128),
 
-    roleIds: z.array(id).min(1).max(50),
+    // Exactly one role per user.
+    roleIds: z.array(id).length(1, "Select exactly one role"),
 
     status: z.enum(["ACTIVE", "DISABLED"]).default("ACTIVE"),
   })

@@ -312,7 +312,7 @@ function ModelHistory({
           },
           { label: "On Hand", value: totals.onHand, color: "text-amber-700" },
           {
-            label: "Don't Wear",
+            label: "WSR",
             value: totals.dontWear,
             color: "text-violet-700",
           },
@@ -415,7 +415,7 @@ function ModelHistory({
                 "Sent Qty",
                 "Returned Qty",
                 "On Hand",
-                "Don't Wear",
+                "WSR",
                 "Status",
               ].map((heading, index) => (
                 <th
@@ -635,7 +635,7 @@ export default function ModelsPage() {
         setHistoryError("");
       } catch (e: unknown) {
         setHistoryError(
-          e instanceof Error ? e.message : "Assignment history unavailable",
+          e instanceof Error ? e.message : "Assign history unavailable",
         );
 
         setAssignments([]);
@@ -745,7 +745,7 @@ export default function ModelsPage() {
           </h1>
 
           <p className="mt-1 text-sm text-slate-500">
-            Manage model profiles, assignments and returns
+            Manage model profiles, assign and returns
           </p>
         </div>
 
@@ -1030,7 +1030,7 @@ export default function ModelsPage() {
                     <tr key={`${m.id}-history`} className="bg-slate-50/80">
                       <td colSpan={7} className="p-5">
                         <h3 className="mb-3 font-bold text-slate-800">
-                          Assignment & Return History - {m.name}
+                          Assign & Return History - {m.name}
                         </h3>
                         {historyError ? (
                           <p className="text-sm text-amber-700">
@@ -1282,7 +1282,7 @@ export default function ModelsPage() {
 
               <p className="mt-3 text-sm text-slate-600">
                 Delete {deleting.name}? This cannot be undone. Linked
-                assignments may prevent deletion.
+                assign records may prevent deletion.
               </p>
 
               <div className="mt-6 flex justify-end gap-3">

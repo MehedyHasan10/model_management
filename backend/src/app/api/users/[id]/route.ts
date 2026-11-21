@@ -6,7 +6,7 @@ import { fail, audit } from "@/lib/common";
 import { Prisma } from "@prisma/client";
 
 const entity = "users";
-const schema = z.object({name:z.string().trim().min(2).max(150),status:z.enum(["ACTIVE","DISABLED"]),roleIds:z.array(z.string().min(1).max(128)).min(1).max(50)}).strict();
+const schema = z.object({name:z.string().trim().min(2).max(150),status:z.enum(["ACTIVE","DISABLED"]),roleIds:z.array(z.string().min(1).max(128)).length(1,"Select exactly one role")}).strict();
 type Ctx = { params: Promise<{ id: string }> };
 function error(e: unknown) {
  if (e instanceof z.ZodError) return NextResponse.json({error:"Validation failed",details:e.flatten()},{status:400});

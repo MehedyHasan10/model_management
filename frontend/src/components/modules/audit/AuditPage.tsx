@@ -61,7 +61,7 @@ export default function AuditPage() {
           label: "Entity",
           render: (row) => (
             <span className="font-medium capitalize text-slate-700">
-              {row.entity || "-"}
+              {row.entity === "assignments" ? "Assign" : row.entity || "-"}
             </span>
           ),
         },

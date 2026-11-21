@@ -334,5 +334,5 @@ model Supplier {
 model SupplierProductSequence {
   supplierId String   @id
   supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-  nextNumber Int      @default(1001)
+  nextNumber Int      @default(101)
 }

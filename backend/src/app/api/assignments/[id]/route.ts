@@ -20,21 +20,21 @@ type Context = { params: Promise<{ id: string }> };
 function domainError(error: unknown) {
   if (!(error instanceof Error)) return null;
   const messages: Record<string, [string, number]> = {
-    ASSIGNMENT_NOT_FOUND: ["Assignment not found", 404],
+    ASSIGNMENT_NOT_FOUND: ["Assign not found", 404],
     ASSIGNMENT_LOCKED: [
-      "Assignment with returns or completed/cancelled status cannot be edited",
+      "Assign with returns or completed/cancelled status cannot be edited",
       409,
     ],
     ASSIGNMENT_HAS_RETURNS: [
-      "Assignment with return history cannot be deleted",
+      "Assign with return history cannot be deleted",
       409,
     ],
-    ASSIGNMENT_NOT_RECEIVABLE: ["Assignment cannot receive returns", 409],
+    ASSIGNMENT_NOT_RECEIVABLE: ["Assign cannot receive returns", 409],
     MODEL_NOT_FOUND: ["Model not found", 404],
     MODEL_INACTIVE: ["Model inactive", 400],
     PRODUCT_NOT_FOUND: ["Product not found", 404],
     DUPLICATE_RETURN_ITEM: ["Duplicate return item", 400],
-    INVALID_ASSIGNMENT_ITEM: ["Item does not belong to this assignment", 400],
+    INVALID_ASSIGNMENT_ITEM: ["Item does not belong to this assign", 400],
     RETURN_EXCEEDS_OUTSTANDING: [
       "Return Qty cannot be more than the On Hand quantity",
       400,
@@ -60,7 +60,7 @@ export async function GET(_req: NextRequest, { params }: Context) {
     });
     return row
       ? assignmentJson(withQuantities(row))
-      : assignmentFail("Assignment not found", 404);
+      : assignmentFail("Assign not found", 404);
   } catch (error) {
     return assignmentError(error);
   }
@@ -161,7 +161,7 @@ export async function POST(req: NextRequest, { params }: Context) {
       return assignmentFail("Forbidden", 403);
     const { id } = await params;
     const raw = await req.json();
-    // Keep existing return validation, and validate independent Don't Wear values.
+    // Keep existing return validation, and validate independent WSR values.
     const input = returnSchema.parse(raw);
     const dontWearInput = z
       .object({

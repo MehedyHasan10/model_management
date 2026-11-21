@@ -1,10 +1,15 @@
 import ExcelJS from "exceljs";
 import { Prisma, PrismaClient } from "@prisma/client";
-import { nextSupplierNumber, supplierPrefix } from "@/lib/product-supplier-code";
+import {
+  DEFAULT_SUPPLIER_START,
+  formatSupplierCode,
+  nextSupplierNumber,
+  previewSupplierCode,
+  supplierCodeFormats,
+} from "@/lib/product-supplier-code";
 
 export const BULK_MAX_ROWS = 1000;
 export const BULK_MAX_BYTES = 5 * 1024 * 1024;
-const DEFAULT_SUPPLIER_START = 1001;
 const MAX_SUPPLIER_NUMBER = 99_999_999;
 
 /** Sample/upload columns. A typed CODE (product SN) is kept; a blank one comes from Code Settings. */
@@ -170,11 +175,11 @@ export async function planBulkImport(client: Client, input: BulkInputRow[]) {
       select: { id: true, name: true, categoryId: true },
     }),
   ]);
+  // Prefix follows the supplier name; padding follows its latest code.
+  const formats = await supplierCodeFormats(client, suppliers);
   const prefixCount = new Map<string, number>();
-  for (const s of suppliers) {
-    const p = supplierPrefix(s.name);
+  for (const { prefix: p } of formats.values())
     prefixCount.set(p, (prefixCount.get(p) ?? 0) + 1);
-  }
 
   const rows: PlannedRow[] = input.map((r) => {
     const errors: string[] = [];
@@ -211,7 +216,7 @@ export async function planBulkImport(client: Client, input: BulkInputRow[]) {
         errors.push(`Supplier "${supplier.name}" is inactive`);
         supplier = undefined;
       } else {
-        const prefix = supplierPrefix(supplier.name);
+        const prefix = formats.get(supplier.id)!.prefix;
         if (!prefix) errors.push("Supplier name has no letters or digits");
         else if ((prefixCount.get(prefix) ?? 0) > 1)
           errors.push(
@@ -222,7 +227,7 @@ export async function planBulkImport(client: Client, input: BulkInputRow[]) {
           const n = m ? Number(m[2]) : NaN;
           if (!m || m[1] !== prefix)
             errors.push(
-              `Supplier code must look like ${prefix}1001 for supplier ${supplier.name}`,
+              `Supplier code must look like ${prefix}${DEFAULT_SUPPLIER_START} for supplier ${supplier.name}`,
             );
           else if (!Number.isSafeInteger(n) || n < 1 || n > MAX_SUPPLIER_NUMBER)
             errors.push("Supplier code number is out of range");
@@ -292,9 +297,8 @@ export async function planBulkImport(client: Client, input: BulkInputRow[]) {
   const nextNumbers = new Map<string, number>();
   for (const supplierId of supplierIds) {
     const own = valid.filter((r) => r.supplierId === supplierId);
-    const prefix = supplierPrefix(
-      suppliers.find((s) => s.id === supplierId)!.name,
-    );
+    const format = formats.get(supplierId)!;
+    const prefix = format.prefix;
     let next = await nextSupplierNumber(client, supplierId, prefix);
     for (const r of own)
       if (!r.autoSupplierCode)
@@ -313,8 +317,8 @@ export async function planBulkImport(client: Client, input: BulkInputRow[]) {
       );
       typedCodes.forEach((c) => used.add(c));
       for (const r of autos) {
-        while (used.has(`${prefix}${next}`)) next++;
-        r.supplierCode = `${prefix}${next++}`;
+        while (used.has(formatSupplierCode(format, next))) next++;
+        r.supplierCode = formatSupplierCode(format, next++);
       }
     }
     nextNumbers.set(supplierId, next);
@@ -485,10 +489,9 @@ export async function buildBulkTemplate(db: PrismaClient) {
   sheet.views = [{ state: "frozen", ySplit: 1 }];
 
   const supplier = suppliers[0];
-  const prefix = supplier ? supplierPrefix(supplier.name) : "KKS";
-  const next = supplier
-    ? await nextSupplierNumber(db, supplier.id, prefix)
-    : DEFAULT_SUPPLIER_START;
+  const sampleSupplierCode =
+    (supplier && (await previewSupplierCode(db, supplier))) ||
+    `KKS${DEFAULT_SUPPLIER_START}`;
   const category =
     categories.find((c) => templates.some((t) => t.categoryId === c.id)) ??
     categories[0];
@@ -502,7 +505,7 @@ export async function buildBulkTemplate(db: PrismaClient) {
     {
       ...example,
       code: productCode(0),
-      supplierCode: `${prefix}${next}`,
+      supplierCode: sampleSupplierCode,
       itemName: "Sample Denim Shirt",
       pp: 400,
       sp: 750,
@@ -559,7 +562,7 @@ export async function buildBulkTemplate(db: PrismaClient) {
     "1. Fill one product per row in the Products sheet. Keep the header row unchanged.",
     `2. CODE: type it (e.g. TT13546) to keep it as-is, or leave it blank to get the next code from Code Settings (e.g. ${productCode(0)}).`,
     "   A typed CODE must be unique. Manual entries continue after the highest typed code with the Code Settings prefix.",
-    `3. SUPPLIER CODE: type it (e.g. ${prefix}${next}) or leave it blank to auto-generate.`,
+    `3. SUPPLIER CODE: type it (e.g. ${sampleSupplierCode}) or leave it blank to auto-generate.`,
     "   When you type a code, the next new product of that supplier continues from the next number.",
     "   The code must start with the supplier name letters (KKS → KKS1050).",
     "4. SUPPLIER NAME, CATEGORY: required, must match existing names (see the Lists sheet).",

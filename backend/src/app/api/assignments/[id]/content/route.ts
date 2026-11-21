@@ -35,7 +35,7 @@ export async function PATCH(req: NextRequest, { params }: Context) {
       return assignmentFail("Only admins can undo content done", 403);
 
     const existing = await db.assignment.findUnique({ where: { id }, select });
-    if (!existing) return assignmentFail("Assignment not found", 404);
+    if (!existing) return assignmentFail("Assign not found", 404);
     // Already in the requested state: keep who marked it and when.
     if (existing.contentDone === done) return assignmentJson(existing);
 

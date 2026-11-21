@@ -58,8 +58,8 @@ export default function ReturnsPage() {
             <div className="flex items-center justify-center gap-1">
               <button
                 type="button"
-                title="View Assignment Details"
-                aria-label="View Assignment Details"
+                title="View Assign Details"
+                aria-label="View Assign Details"
                 onClick={() => setSelectedDetails(row)}
                 className="rounded-lg p-2 text-blue-600 transition hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
               >

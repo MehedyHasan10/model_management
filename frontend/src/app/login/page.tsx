@@ -43,7 +43,7 @@ const steps = [
   {
     Icon: UsersRound,
 
-    title: "Model assignments",
+    title: "Model assign",
 
     detail: "Sample handoffs & tracking",
 
@@ -374,7 +374,7 @@ export default function Login() {
           </h1>
 
           <p className="mm-enter-late mt-5 max-w-[500px] text-sm leading-7 text-indigo-100/70 xl:text-base">
-            Bring product specifications, model assignments, and sample returns
+            Bring product specifications, model assign, and sample returns
             together in one secure operations workspace.
           </p>
 

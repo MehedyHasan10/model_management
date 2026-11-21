@@ -12,6 +12,7 @@ import {
 import {
   ChevronLeft,
   ChevronRight,
+  Copy,
   Eye,
   Grid2X2,
   Image as ImageIcon,
@@ -285,6 +286,7 @@ export default function ProductsPage() {
   const [formError, setFormError] = useState("");
 
   const [busy, setBusy] = useState(false);
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
 
   const [uploading, setUploading] = useState(false);
 
@@ -635,6 +637,26 @@ export default function ProductsPage() {
     }
   };
 
+  // Server copies the product with a new product code and the supplier's next code.
+  const duplicate = async (p: Product) => {
+    if (duplicatingId) return;
+    setDuplicatingId(p.id);
+    try {
+      const copy = await api<Product>(
+        `products/${encodeURIComponent(p.id)}/duplicate`,
+        { method: "POST" },
+      );
+      toast.success(
+        `Duplicated as ${copy.sn}${copy.supplierCode ? ` (${copy.supplierCode})` : ""}`,
+      );
+      await reload();
+    } catch (e: any) {
+      toast.error(readableError(e));
+    } finally {
+      setDuplicatingId(null);
+    }
+  };
+
   const reset = () => {
     setSearch("");
 
@@ -696,6 +718,22 @@ export default function ProductsPage() {
           className="rounded-lg border border-violet-200 p-2 text-violet-600 hover:bg-violet-50"
         >
           <Pencil size={17} />
+        </button>
+      )}
+
+      {has("create") && (
+        <button
+          title="Duplicate"
+          aria-label="Duplicate"
+          disabled={duplicatingId !== null}
+          onClick={() => void duplicate(p)}
+          className="rounded-lg border border-emerald-200 p-2 text-emerald-600 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {duplicatingId === p.id ? (
+            <Loader2 size={17} className="animate-spin" />
+          ) : (
+            <Copy size={17} />
+          )}
         </button>
       )}
 
@@ -946,8 +984,15 @@ export default function ProductsPage() {
                     key={p.id}
                     className="border-t border-slate-100 hover:bg-violet-50/30"
                   >
-                    <td className="px-4 py-3 font-bold text-violet-700">
-                      {p.sn}
+                    <td className="px-4 py-3">
+                      <button
+                        type="button"
+                        title="Preview product"
+                        onClick={() => setPreview(p)}
+                        className="cursor-pointer rounded-md bg-violet-50 px-2 py-1 text-xs font-bold text-violet-700 transition hover:bg-violet-600 hover:text-white focus-visible:outline-2 focus-visible:outline-violet-600"
+                      >
+                        {p.sn}
+                      </button>
                     </td>
 
                     <td className="px-4 py-3">{p.supplierCode || "-"}</td>
@@ -1009,7 +1054,14 @@ export default function ProductsPage() {
                   <div className="flex justify-between gap-2">
                     <strong className="truncate">{p.itemName}</strong>
 
-                    <span className="text-xs text-violet-700">{p.sn}</span>
+                    <button
+                      type="button"
+                      title="Preview product"
+                      onClick={() => setPreview(p)}
+                      className="shrink-0 rounded-md bg-violet-50 px-2 py-0.5 text-xs font-semibold text-violet-700 hover:bg-violet-600 hover:text-white"
+                    >
+                      {p.sn}
+                    </button>
                   </div>
 
                   <p className="text-xs text-slate-500">

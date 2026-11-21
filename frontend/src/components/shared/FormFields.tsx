@@ -62,11 +62,14 @@ export function CheckList({
   options,
   selected,
   onChange,
+  single = false,
 }: {
   title: string;
   options: { id: string; name: string }[];
   selected: string[];
   onChange: (ids: string[]) => void;
+  /** Radio buttons: exactly one option can be selected. */
+  single?: boolean;
 }) {
   return (
     <div className="col-span-full">
@@ -75,13 +78,16 @@ export function CheckList({
         {options.map((o) => (
           <label key={o.id}>
             <input
-              type="checkbox"
+              type={single ? "radio" : "checkbox"}
+              name={single ? title : undefined}
               checked={selected.includes(o.id)}
               onChange={(e) =>
                 onChange(
-                  e.target.checked
-                    ? [...selected, o.id]
-                    : selected.filter((x) => x !== o.id),
+                  single
+                    ? [o.id]
+                    : e.target.checked
+                      ? [...selected, o.id]
+                      : selected.filter((x) => x !== o.id),
                 )
               }
             />

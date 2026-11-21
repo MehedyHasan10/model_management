@@ -155,14 +155,15 @@ function Form({ value, change, related }: FormProps) {
             </h3>
 
             <p className="text-xs text-slate-500">
-              Select the roles assigned to this user
+              Select one role for this user
             </p>
           </div>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4">
           <CheckList
-            title="Assign Roles"
+            title="Assign Role"
+            single
             options={related.roles || []}
             selected={value.roleIds || []}
             onChange={(v) => change("roleIds", v)}
@@ -176,7 +177,7 @@ function Form({ value, change, related }: FormProps) {
 
         <p className="text-xs leading-5 text-blue-700">
           User access is controlled by assigned roles and permissions. Make sure
-          the selected roles provide the appropriate level of access.
+          the selected role provides the appropriate level of access.
         </p>
       </div>
     </>
@@ -203,7 +204,8 @@ export default function UsersPage() {
       relatedKeys={["roles"]}
       prepareEdit={(row) => ({
         ...row,
-        roleIds: row.roles?.map((role: any) => role.roleId) || [],
+        // One role per user; older users with several keep only the first on save.
+        roleIds: row.roles?.[0]?.roleId ? [row.roles[0].roleId] : [],
       })}
       columns={[
         {

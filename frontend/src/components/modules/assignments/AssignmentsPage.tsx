@@ -121,7 +121,7 @@ function AssignmentDetailsView({
       className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/60 p-3 sm:p-6"
       role="dialog"
       aria-modal="true"
-      aria-label="View Assignment Details"
+      aria-label="View Assign Details"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -171,7 +171,7 @@ function AssignmentDetailsView({
             </div>
             {assignment.notes && (
               <div className="sm:col-span-4">
-                <p className="text-xs text-slate-500">Assignment Notes</p>
+                <p className="text-xs text-slate-500">Assign Notes</p>
                 <p>{assignment.notes}</p>
               </div>
             )}
@@ -244,7 +244,7 @@ function AssignmentDetailsView({
                         <th className="px-3 py-3 text-center">Sent</th>
                         <th className="px-3 py-3 text-center">Returned</th>
                         <th className="px-3 py-3 text-center">On Hand</th>
-                        <th className="px-3 py-3 text-center">Don't Wear</th>
+                        <th className="px-3 py-3 text-center">WSR</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -299,7 +299,7 @@ function AssignmentDetailsView({
                           const ai = (assignment.items || []).find(
                             (x: any) => x.id === i.assignmentItemId,
                           );
-                          return `${ai?.product?.itemName || "Product"} (${ai?.size || "-"}): ${plural(i.quantity, "pc", "pcs")} returned · Don't Wear: ${Number(i.dontWearQty || 0)}${i.condition ? ` · ${i.condition}` : ""}`;
+                          return `${ai?.product?.itemName || "Product"} (${ai?.size || "-"}): ${plural(i.quantity, "pc", "pcs")} returned · WSR: ${Number(i.dontWearQty || 0)}${i.condition ? ` · ${i.condition}` : ""}`;
                         })
                         .join("; ")}
                     </div>
@@ -1171,7 +1171,7 @@ function ReceiveReturnView({
           Number(dontWearQty[item.id] || 0) < 0,
       )
     ) {
-      toast.error("Don't Wear Quantity must be a non-negative integer");
+      toast.error("WSR Quantity must be a non-negative integer");
       return;
     }
     setBusy(true);
@@ -1319,7 +1319,7 @@ function ReceiveReturnView({
                           Return Qty
                         </th>
                         <th className="whitespace-nowrap px-3 py-3">
-                          Don't Wear Qty
+                          WSR Qty
                         </th>
                       </tr>
                     </thead>
@@ -1412,7 +1412,7 @@ function ReceiveReturnView({
                                         : Number(e.target.value),
                                   }))
                                 }
-                                aria-label={`Don't Wear quantity for ${item.size}`}
+                                aria-label={`WSR quantity for ${item.size}`}
                                 className="w-24 rounded-lg border border-slate-200 bg-white px-3 py-2 outline-none focus:border-violet-500 disabled:bg-slate-100"
                               />
                             </td>
@@ -1559,8 +1559,8 @@ export default function AssignmentsPage() {
             <div className="flex items-center gap-1">
               <button
                 type="button"
-                title="View Assignment Details"
-                aria-label="View Assignment Details"
+                title="View Assign Details"
+                aria-label="View Assign Details"
                 onClick={() => setViewAssignment(r)}
                 className="rounded-lg p-2 text-blue-600 hover:bg-blue-50"
               >

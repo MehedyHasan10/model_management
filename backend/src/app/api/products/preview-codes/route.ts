@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { currentUser, can } from "@/lib/auth";
 import { fail } from "@/lib/common";
-import { nextSupplierNumber, supplierPrefix } from "@/lib/product-supplier-code";
+import { previewSupplierCode } from "@/lib/product-supplier-code";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,12 +23,11 @@ export async function GET(req: NextRequest) {
     if (supplierId) {
       const supplier = await db.supplier.findUnique({
         where: { id: supplierId },
-        select: { name: true, status: true },
+        select: { id: true, name: true, status: true },
       });
       if (!supplier || supplier.status !== "ACTIVE") return fail("Supplier unavailable", 400);
-      const prefix = supplierPrefix(supplier.name);
-      if (!prefix) return fail("Supplier prefix invalid", 400);
-      supplierCode = `${prefix}${await nextSupplierNumber(db, supplierId, prefix)}`;
+      supplierCode = await previewSupplierCode(db, supplier);
+      if (!supplierCode) return fail("Supplier prefix invalid", 400);
     }
 
     return NextResponse.json({ productCode, supplierCode }, {
